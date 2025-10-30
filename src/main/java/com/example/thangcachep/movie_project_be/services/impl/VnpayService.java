@@ -42,7 +42,13 @@ public class VnpayService {
             throw new IllegalArgumentException("Số tiền không hợp lệ");
         }
 
-        String bankCode = "NCB";
+        // Sử dụng bankCode từ request, mặc định là BIDV nếu không có
+        String bankCode = (paymentRequest.getBankCode() != null && !paymentRequest.getBankCode().isEmpty()) 
+                ? paymentRequest.getBankCode() 
+                : "BIDV";
+        
+        log.info("🏦 Ngân hàng được chọn: {}", bankCode);
+        
         String vnp_TxnRef = VnPayConfig.getRandomNumber(8);
         String vnp_IpAddr = "127.0.0.1";
         String vnp_TmnCode = VnPayConfig.vnp_TmnCode;
