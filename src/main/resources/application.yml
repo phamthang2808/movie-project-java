@@ -57,10 +57,21 @@ app:
 #  "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqldump.exe" -u root -p --databases hotel --routines --triggers --events --single-transaction --quick --set-gtid-purged=OFF --add-drop-table > sql\hotel.sql
 #"C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqldump.exe" -u root -p --databases hotel --routines --triggers --events --single-transaction --quick --set-gtid-purged=OFF --add-drop-table > hotel.sql
 
-# paypal
-#  tự tạo develop :)) dùng này của tui cũng đc
+# PayPal Configuration
+# Mode: sandbox (for testing) or live (for production)
+# Get your credentials from: https://developer.paypal.com/dashboard/
 paypal:
   mode: sandbox
-  client:
+  client:  # <-- Phải lồng "client" vào đây
+    # Thụt lề 2 dòng này
     id: AWuXaji91ZBIHvYz2bUCt2eSVWs_bBPETzVj4huU2KeiDrE32XoDvh1PUQ2FQxuZ9iW2mINxtzyFFs-z
     secret: EEM3Grc7VupTqDHhdJLuxrkNlvwapTSHfBF5Nw-j6OE9X3ERjPgTYvajwliwKfCypmQ4teXqanu3VktH
+
+# VNPay Configuration
+# Get your credentials from: https://sandbox.vnpayment.vn/merchantv2/
+vnpay:
+  tmn-code: JGV9MSIF
+  secret-key: E9QLQ1W7KCLQKQLE5522R5JNRR7WIV8I
+  pay-url: https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
+  api-url: https://sandbox.vnpayment.vn/merchant_webapi/api/transaction
+  return-url: http://localhost:8088/api/v1/vnpay/return

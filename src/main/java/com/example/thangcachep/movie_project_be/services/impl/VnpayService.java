@@ -5,18 +5,30 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TimeZone;
 
-import com.example.thangcachep.movie_project_be.config.VnPayConfig;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
+import com.example.thangcachep.movie_project_be.config.VnPayConfig;
+import com.example.thangcachep.movie_project_be.models.request.VnpayRequest;
+
+import lombok.extern.slf4j.Slf4j;
+
 
 @Service
+@Slf4j
 public class VnpayService {
 
     public String createPayment(VnpayRequest paymentRequest) throws UnsupportedEncodingException {
+        log.info("📝 Bắt đầu tạo payment VNPay - Số tiền: {} VND", paymentRequest.getAmount());
         String vnp_Version = "2.1.0";
         String vnp_Command = "pay";
         String orderType = "other";
@@ -24,7 +36,9 @@ public class VnpayService {
         long amount = 0;
         try {
             amount = Long.parseLong(paymentRequest.getAmount()) * 100;
+            log.debug("💰 Số tiền sau khi convert: {} (x100)", amount);
         } catch (NumberFormatException e) {
+            log.error("❌ Số tiền không hợp lệ: {}", paymentRequest.getAmount());
             throw new IllegalArgumentException("Số tiền không hợp lệ");
         }
 
@@ -79,16 +93,26 @@ public class VnpayService {
         if (hashData.length() > 0)
             hashData.setLength(hashData.length() - 1);
 
-        String vnp_SecureHash = VnPayConfig.hmacSHA512(VnPayConfig.secretKey, hashData.toString());
+        String vnp_SecureHash = VnPayConfig.hmacSHA512(VnPayConfig.vnp_SecretKey, hashData.toString());
         query.append("&vnp_SecureHash=").append(vnp_SecureHash);
-        return VnPayConfig.vnp_PayUrl + "?" + query;
+        
+        String paymentUrl = VnPayConfig.vnp_PayUrl + "?" + query;
+        log.info("✅ Tạo VNPay payment URL thành công - Mã giao dịch: {}", vnp_TxnRef);
+        log.debug("🔗 Payment URL: {}", paymentUrl);
+        
+        return paymentUrl;
     }
 
     public ResponseEntity<String> handlePaymentReturn(String responseCode) {
+        log.info("🔙 Nhận callback từ VNPay - Response Code: {}", responseCode);
+        
         if ("00".equals(responseCode)) {
-            return ResponseEntity.ok("Thanh toán thành công!");
+            log.info("✅ Thanh toán VNPay thành công!");
+            return ResponseEntity.ok("✅ Thanh toán thành công!");
         } else {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Thanh toán thất bại! Mã lỗi: " + responseCode);
+            log.warn("❌ Thanh toán VNPay thất bại - Mã lỗi: {}", responseCode);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("❌ Thanh toán thất bại! Mã lỗi: " + responseCode);
         }
     }
 }

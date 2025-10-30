@@ -14,16 +14,53 @@ import java.util.Random;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
-import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Configuration;
 
+import jakarta.annotation.PostConstruct;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
+
+@Configuration
+@Slf4j
 public class VnPayConfig {
 
-    public static String vnp_PayUrl = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html";
-    public static String vnp_ReturnUrl = "http://localhost:8080/api/vnpayment/return";
-    // #vnpay
-    public static String vnp_TmnCode = "JGV9MSIF";
-    public static String secretKey = "E9QLQ1W7KCLQKQLE5522R5JNRR7WIV8I";
-    public static String vnp_ApiUrl = "https://sandbox.vnpayment.vn/merchant_webapi/api/transaction";
+    // Đọc từ application.yml qua @Value
+    @Value("${vnpay.tmn-code}")
+    private String tmnCode;
+
+    @Value("${vnpay.secret-key}")
+    private String secretKey;
+
+    @Value("${vnpay.pay-url}")
+    private String payUrl;
+
+    @Value("${vnpay.api-url}")
+    private String apiUrl;
+
+    @Value("${vnpay.return-url}")
+    private String returnUrl;
+    
+    // Static variables để tương thích với code cũ
+    public static String vnp_PayUrl;
+    public static String vnp_ReturnUrl;
+    public static String vnp_TmnCode;
+    public static String vnp_SecretKey;
+    public static String vnp_ApiUrl;
+    
+    @PostConstruct
+    public void init() {
+        // Populate static variables sau khi Spring inject properties
+        vnp_PayUrl = this.payUrl;
+        vnp_ReturnUrl = this.returnUrl;
+        vnp_TmnCode = this.tmnCode;
+        VnPayConfig.vnp_SecretKey = this.secretKey;
+        vnp_ApiUrl = this.apiUrl;
+        
+        log.info("✅ Khởi tạo VNPay Config - TMN Code: {}", tmnCode);
+        log.info("🔗 VNPay Payment URL: {}", payUrl);
+        log.info("🔙 VNPay Return URL: {}", returnUrl);
+    }
 
     public static String md5(String message) {
         String digest = null;
@@ -79,7 +116,7 @@ public class VnPayConfig {
                 sb.append("&");
             }
         }
-        return hmacSHA512(secretKey, sb.toString());
+        return hmacSHA512(vnp_SecretKey, sb.toString());
     }
 
     public static String hmacSHA512(final String key, final String data) {

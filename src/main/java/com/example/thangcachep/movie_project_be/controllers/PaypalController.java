@@ -1,60 +1,109 @@
 package com.example.thangcachep.movie_project_be.controllers;
 
-
-
-import com.example.thangcachep.movie_project_be.models.request.PaypalRequest;
-import com.example.thangcachep.movie_project_be.services.impl.PaypalService;
-import com.paypal.api.payments.Payment;
-import com.paypal.base.rest.PayPalRESTException;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.example.thangcachep.movie_project_be.models.request.PayPalPaymentRequest;
+import com.example.thangcachep.movie_project_be.services.impl.PayPalService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
+import java.util.Map;
+
 @RestController
-@RequestMapping("/api/paypal")
-public class PaypalController {
+@RequestMapping("${api.prefix}/paypal")
+@RequiredArgsConstructor
+@Slf4j
+public class PayPalController {
 
-    @Autowired
-    private PaypalService paypalService;
+    private final PayPalService payPalService;
 
-    @PostMapping()
-    public ResponseEntity<String> createPayment(@RequestBody PaypalRequest paypalRequest) {
-        double amount = 0;
-
+    /**
+     * Tạo payment và nhận approval URL
+     * POST /api/v1/paypal/create
+     */
+    @PostMapping("/create")
+    public ResponseEntity<?> createPayment(@RequestBody PayPalPaymentRequest request) {
         try {
-            amount = Double.parseDouble(paypalRequest.getTotal()) * 100.0;
-        } catch (NumberFormatException e) {
-            return ResponseEntity.badRequest().body("Số tiền không hợp lệ");
-        }
-
-        try {
-            String approvalUrl = paypalService.createPayment(amount, paypalRequest.getCurrency(),
-                    "Payment for Order",
-                    "http://localhost:8080/api/paypal/cancel",
-                    "http://localhost:8080/api/paypal/success");
-            return ResponseEntity.ok(approvalUrl);
-        } catch (PayPalRESTException e) {
-            e.printStackTrace();
+            log.info("📨 Nhận request tạo PayPal payment - Số tiền: {} {}", 
+                    request.getAmount(), request.getCurrency());
+            
+            // Validate request
+            if (request.getAmount() == null || request.getAmount() <= 0) {
+                log.warn("⚠️ Số tiền không hợp lệ: {}", request.getAmount());
+                return ResponseEntity.badRequest()
+                        .body(createErrorResponse("Số tiền không hợp lệ"));
+            }
+            
+            if (request.getCurrency() == null || request.getCurrency().isEmpty()) {
+                request.setCurrency("USD"); // Default currency
+                log.info("💱 Sử dụng tiền tệ mặc định: USD");
+            }
+            
+            // Create payment
+            String approvalUrl = payPalService.createPayment(request);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("approvalUrl", approvalUrl);
+            response.put("message", "✅ Tạo thanh toán thành công. Vui lòng chuyển đến PayPal để hoàn tất.");
+            
+            log.info("✅ Trả về approval URL cho client");
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            log.error("❌ Lỗi tạo PayPal payment: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Error creating payment: " + e.getMessage());
+                    .body(createErrorResponse("Không thể tạo thanh toán: " + e.getMessage()));
         }
     }
 
+    /**
+     * Callback sau khi user approve payment trên PayPal
+     * GET /api/v1/paypal/success?token=ORDER_ID
+     */
     @GetMapping("/success")
-    public ResponseEntity<String> success(@RequestParam("paymentId") String paymentId,
-                                          @RequestParam("PayerID") String payerId) {
+    public ResponseEntity<?> successPayment(@RequestParam("token") String orderId) {
         try {
-            Payment payment = paypalService.executePayment(paymentId, payerId);
-            return ResponseEntity.ok("Payment Success! Payment ID: " + payment.getId());
-        } catch (PayPalRESTException e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Payment execution failed: " + e.getMessage());
+            log.info("🎉 User đã approve payment - Order ID: {}", orderId);
+            
+            String result = payPalService.capturePayment(orderId);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("orderId", orderId);
+            response.put("message", result);
+            
+            log.info("✅ Capture payment thành công");
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            log.error("❌ Lỗi capture payment: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(createErrorResponse("Không thể hoàn tất thanh toán: " + e.getMessage()));
         }
     }
 
+    /**
+     * Callback khi user cancel payment
+     * GET /api/v1/paypal/cancel
+     */
     @GetMapping("/cancel")
-    public ResponseEntity<String> cancel() {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Payment was canceled");
+    public ResponseEntity<?> cancelPayment() {
+        log.warn("❌ User đã hủy thanh toán PayPal");
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", false);
+        response.put("message", "Thanh toán đã bị hủy bởi người dùng");
+        
+        return ResponseEntity.ok(response);
+    }
+
+    private Map<String, Object> createErrorResponse(String message) {
+        Map<String, Object> error = new HashMap<>();
+        error.put("success", false);
+        error.put("message", message);
+        return error;
     }
 }
