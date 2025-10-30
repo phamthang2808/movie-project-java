@@ -56,3 +56,11 @@ app:
   upload-dir: uploads
 #  "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqldump.exe" -u root -p --databases hotel --routines --triggers --events --single-transaction --quick --set-gtid-purged=OFF --add-drop-table > sql\hotel.sql
 #"C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqldump.exe" -u root -p --databases hotel --routines --triggers --events --single-transaction --quick --set-gtid-purged=OFF --add-drop-table > hotel.sql
+
+# paypal
+#  tự tạo develop :)) dùng này của tui cũng đc
+paypal:
+  mode: sandbox
+  client:
+    id: AWuXaji91ZBIHvYz2bUCt2eSVWs_bBPETzVj4huU2KeiDrE32XoDvh1PUQ2FQxuZ9iW2mINxtzyFFs-z
+    secret: EEM3Grc7VupTqDHhdJLuxrkNlvwapTSHfBF5Nw-j6OE9X3ERjPgTYvajwliwKfCypmQ4teXqanu3VktH
