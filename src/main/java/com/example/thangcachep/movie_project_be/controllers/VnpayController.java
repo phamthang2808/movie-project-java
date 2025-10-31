@@ -15,6 +15,8 @@ import com.example.thangcachep.movie_project_be.services.impl.VnpayService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("${api.prefix}/vnpay")
 @RequiredArgsConstructor
@@ -52,8 +54,16 @@ public class VnpayController {
      * GET /api/v1/vnpay/return?vnp_ResponseCode=00
      */
     @GetMapping("/return")
-    public ResponseEntity<String> returnPayment(@RequestParam("vnp_ResponseCode") String responseCode) {
-        log.info("🔙 Nhận return từ VNPay với response code: {}", responseCode);
-        return vnpayService.handlePaymentReturn(responseCode);
+    public ResponseEntity<?> vnpReturn(@RequestParam Map<String, String> params) {
+        return vnpayService.verifyAndProcess(params, false);
+    }
+
+    // IPN URL (server-to-server, dùng để chốt giao dịch, độ tin cậy cao)
+    @GetMapping("/ipn")
+    public ResponseEntity<String> vnpIpn(@RequestParam Map<String, String> params) {
+        // Theo spec VNPay, IPN nên trả về chuỗi (OK/ERROR...) – tuỳ yêu cầu bạn có thể thay đổi
+        return vnpayService.verifyAndProcess(params, true).getStatusCode().is2xxSuccessful()
+                ? ResponseEntity.ok("OK")
+                : ResponseEntity.status(HttpStatus.BAD_REQUEST).body("ERROR");
     }
 }

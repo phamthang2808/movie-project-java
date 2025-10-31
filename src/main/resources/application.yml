@@ -1,5 +1,5 @@
 server:
-  port: 8088
+  port: 8080
   error:
     include-message: always
     include-binding-errors: always
@@ -33,7 +33,14 @@ spring:
   web:
     resources:
       static-locations: classpath:/static/, file:./${app.upload-dir}/
-
+  ai:
+    openai:
+      apikey: AIzaSyAfEiTCu-uLWmo6oliaPOfj6cPKFVQAnMA
+      chat:
+        base-url: https://generativelanguage.googleapis.com
+        completions-path: /v1beta/openai/chat/completions
+        options:
+          model: gemini-2.0-flash
 api:
   prefix: /api/v1
 
@@ -74,4 +81,8 @@ vnpay:
   secret-key: E9QLQ1W7KCLQKQLE5522R5JNRR7WIV8I
   pay-url: https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
   api-url: https://sandbox.vnpayment.vn/merchant_webapi/api/transaction
-  return-url: http://localhost:8088/api/v1/vnpay/return
+  return-url: http://localhost:5173/vnpay/return
+
+#gemini:
+#  api-key: AIzaSyAfEiTCu-uLWmo6oliaPOfj6cPKFVQAnMA
+#  api-url: https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent
