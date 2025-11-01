@@ -6,16 +6,16 @@ server:
 
 spring:
   application:
-    name: cdio
+    name: movie-project-be # <-- ĐÃ CẬP NHẬT
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/hotel?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true}
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://shuttle.proxy.rlwy.net:33159/railway?useSSL=true}
     driver-class-name: com.mysql.cj.jdbc.Driver
     username: root
-    password: ${MYSQL_ROOT_PASSWORD:123456}
+    password: ${MYSQL_ROOT_PASSWORD:ELmYQuCJJkWotiqVTypaKLFbBvVrbzwm}
   jpa:
     show-sql: true
     hibernate:
-      ddl-auto: none
+      ddl-auto: update
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL8Dialect
@@ -24,6 +24,7 @@ spring:
         use_sql_comments: true # thêm comment cho câu SQL
   servlet:
     multipart:
+      enabled: true # <-- ĐÃ THÊM
       max-file-size: 10MB
       max-request-size: 10MB
   messages:
@@ -33,6 +34,11 @@ spring:
   web:
     resources:
       static-locations: classpath:/static/, file:./${app.upload-dir}/
+    # KHỐI (BLOCK) MỚI ĐƯỢC THÊM TỪ FILE .properties
+    cors:
+      allowed-origins: http://localhost:5173,http://localhost:3000
+      allowed-methods: GET,POST,PUT,DELETE,OPTIONS
+      allowed-headers: "*"
   ai:
     openai:
       apikey: AIzaSyAfEiTCu-uLWmo6oliaPOfj6cPKFVQAnMA
@@ -47,9 +53,15 @@ api:
 jwt:
   expiration: 2592000
   secretKey: TaqlmGv1iEDMRiFp/pHuID1+T84IABfuA0xXh4GhiUI=
+  refresh-expiration: 2592000 # <-- ĐÃ THÊM
 
 logging:
   level:
+    # MỤC MỚI ĐƯỢC THÊM TỪ FILE .properties
+    com:
+      example:
+        thangcachep:
+          movie_project_be: DEBUG
     org:
       springframework:
         security: DEBUG

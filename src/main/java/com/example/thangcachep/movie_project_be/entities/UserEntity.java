@@ -1,78 +1,104 @@
 package com.example.thangcachep.movie_project_be.entities;
 
-import jakarta.persistence.*;
-import lombok.*;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Set;
+
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
+/**
+ * Entity cho bảng Users
+ * Lưu trữ thông tin người dùng: admin, staff, user
+ */
 @Entity
 @Table(name = "users")
 @Getter
 @Setter
-@AllArgsConstructor
 @NoArgsConstructor
+@AllArgsConstructor
 @Builder
+public class UserEntity extends BaseEntity implements UserDetails {
 
-public class UserEntity extends BaseEntity implements UserDetails  {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "user_id")
-    private Long userId;
-
-    @Column(name="full_name", nullable = false)
-    private String fullName;
-
-    @Column(nullable = false)
+    @Column(nullable = false, unique = true, length = 100)
     private String email;
 
-    @Column(name = "phone", nullable = false)
-    private String phoneNumber;
-
-    @Column(nullable = false)
+    @Column(nullable = false, length = 255)
     private String password;
 
-    @Column(name = "img", nullable = false)
-    private String img;
+    @Column(nullable = false, length = 100)
+    private String name;
 
-    @Column(name = "is_active")
-    private Boolean active;
-
-    @Column(name = "facebook_account_id")
-    private int facebookAccountId;
-
-    @Column(name = "google_account_id")
-    private int googleAccountId;
-
-    @OneToMany(mappedBy = "staff", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<ManagementRoomEntity> managementRooms;
-
-    @OneToMany(mappedBy = "staff", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<ReplyEntity> reply;
+    @Column(length = 500)
+    private String avatarUrl;
 
     @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "role_id", referencedColumnName = "role_id")
+    @JoinColumn(name = "role_id", nullable = false)
     private RoleEntity role;
 
+    @Column(nullable = false)
+    private Double balance = 0.0;
+
+    @Column(nullable = false)
+    private Boolean isVip = false;
+
+    @Column
+    private LocalDateTime vipExpiredAt;
+
+    @Column(nullable = false)
+    private Boolean isEmailVerified = false;
+
+    @Column(nullable = false)
+    private Boolean isActive = true;
+
+    // Relationships
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<CommentEntity> comments = new HashSet<>();
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<RatingEntity> ratings = new HashSet<>();
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<FavoriteEntity> favorites = new HashSet<>();
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<WatchlistEntity> watchlists = new HashSet<>();
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<WatchHistoryEntity> watchHistories = new HashSet<>();
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<TransactionEntity> transactions = new HashSet<>();
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<NotificationEntity> notifications = new HashSet<>();
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<ReportEntity> reports = new HashSet<>();
+
+    // UserDetails implementation
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        List<SimpleGrantedAuthority> authorityList = new ArrayList<>();
-        authorityList.add(new SimpleGrantedAuthority("ROLE_" + getRole().getRoleName().toUpperCase()));
-        return authorityList;
-    }
-
-    @Override
-    public String getPassword() {
-        return password;
+        Collection<SimpleGrantedAuthority> authorities = new ArrayList<>();
+        if (role != null) {
+            authorities.add(new SimpleGrantedAuthority("ROLE_" + role.getName().toUpperCase()));
+        }
+        return authorities;
     }
 
     @Override
     public String getUsername() {
-        return phoneNumber;
+        return email;
     }
 
     @Override
@@ -82,7 +108,7 @@ public class UserEntity extends BaseEntity implements UserDetails  {
 
     @Override
     public boolean isAccountNonLocked() {
-        return true;
+        return isActive;
     }
 
     @Override
@@ -92,7 +118,7 @@ public class UserEntity extends BaseEntity implements UserDetails  {
 
     @Override
     public boolean isEnabled() {
-        return true;
+        return isActive && isEmailVerified;
     }
-
 }
+

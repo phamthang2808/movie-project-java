@@ -1,25 +1,26 @@
 package com.example.thangcachep.movie_project_be.entities;
 
-
-import jakarta.persistence.Column;
-import jakarta.persistence.MappedSuperclass;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
-import lombok.*;
+import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import lombok.Getter;
+import lombok.Setter;
 
-@Data//toString
+/**
+ * Base Entity class chứa các trường chung cho tất cả entities
+ */
+@MappedSuperclass
 @Getter
 @Setter
-@AllArgsConstructor
-@NoArgsConstructor
-@MappedSuperclass
+public abstract class BaseEntity {
 
-public class BaseEntity{
-    @Column(name = "created_at")
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @Column(name = "updated_at")
+    @Column(nullable = false)
     private LocalDateTime updatedAt;
 
     @PrePersist
@@ -32,5 +33,5 @@ public class BaseEntity{
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
     }
-
 }
+

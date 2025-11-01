@@ -56,14 +56,16 @@ package com.example.thangcachep.movie_project_be.[subpackage];
 
 ### 2. Import Statements
 Thay thế trong tất cả files:
+
 ```java
 // Trước
+
 import com.project.cdio.services.UserService;
 import com.project.cdio.models.dto.UserDTO;
 
 // Sau
 import com.example.thangcachep.movie_project_be.services.UserService;
-import com.example.thangcachep.movie_project_be.models.dto.UserDTO;
+
 ```
 
 ## Kiểm Tra & Xác Nhận

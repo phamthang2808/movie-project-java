@@ -1,27 +1,38 @@
 package com.example.thangcachep.movie_project_be.entities;
 
-
 import jakarta.persistence.*;
-import lombok.*;
+import java.util.HashSet;
+import java.util.Set;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
+/**
+ * Entity cho bảng Roles
+ * Lưu trữ các vai trò trong hệ thống: ADMIN, STAFF, USER
+ */
 @Entity
 @Table(name = "roles")
 @Getter
 @Setter
-@AllArgsConstructor
 @NoArgsConstructor
+@AllArgsConstructor
 @Builder
+public class RoleEntity extends BaseEntity {
 
-public class RoleEntity extends BaseEntity  {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "role_id")
-    private Long roleId;
+    @Column(nullable = false, unique = true, length = 50)
+    private String name; // ADMIN, STAFF, USER
 
-    @Column(name = "role_name", nullable = false, unique = true, length = 100)
-    private String roleName;
+    @Column(length = 255)
+    private String description;
 
-    public static String ADMIN = "ADMIN";
-    public static String USER = "USER";
+    @Column(nullable = false)
+    private Boolean isActive = true;
 
+    // Relationships
+    @OneToMany(mappedBy = "role")
+    private Set<UserEntity> users = new HashSet<>();
 }
+
