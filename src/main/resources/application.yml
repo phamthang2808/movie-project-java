@@ -98,3 +98,25 @@ vnpay:
 #gemini:
 #  api-key: AIzaSyAfEiTCu-uLWmo6oliaPOfj6cPKFVQAnMA
 #  api-url: https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent
+
+
+# Cấu hình cho Cloudflare R2 Storage
+r2:
+  bucket-name: "thangcachep-video" # <-- Tên bucket bạn đã tạo
+
+  # Ghép Account ID vào đây
+  endpoint: https://f0f2672db9148f22e73449d471512551.r2.cloudflarestorage.com
+
+  # Dán Public URL (bạn lấy ở bước trước)
+  public-url: https://pub-84089b75c7394683b414ceb19004efb8.r2.dev
+
+  # Dán 2 key bạn vừa tạo
+  access-key: 25f4de8a67520cbdf11d17ac0d8b8b47
+  secret-key: fe614fb2cf286d1ca67e3dbb58233a6970a39c79e475cc30bbb9c3092779c83f
+
+  # Giữ nguyên
+  region: "auto"
+#account id            f0f2672db9148f22e73449d471512551
+#ten mien              https://pub-84089b75c7394683b414ceb19004efb8.r2.dev
+#Access Key ID        25f4de8a67520cbdf11d17ac0d8b8b47
+#Secret Access Key    fe614fb2cf286d1ca67e3dbb58233a6970a39c79e475cc30bbb9c3092779c83f
