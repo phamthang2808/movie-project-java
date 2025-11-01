@@ -47,6 +47,20 @@ spring:
         completions-path: /v1beta/openai/chat/completions
         options:
           model: gemini-2.0-flash
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    # Tên email của bạn đã được thêm vào
+    username: phamthang28082004@gmail.com
+    # Mật khẩu ứng dụng (16 chữ cái) đã được thêm vào
+    password: oqhjlmqlhwfrfbfz
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
 api:
   prefix: /api/v1
 
@@ -73,6 +87,7 @@ logging:
 
 app:
   upload-dir: uploads
+  base-url: http://localhost:5173
 #  "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqldump.exe" -u root -p --databases hotel --routines --triggers --events --single-transaction --quick --set-gtid-purged=OFF --add-drop-table > sql\hotel.sql
 #"C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqldump.exe" -u root -p --databases hotel --routines --triggers --events --single-transaction --quick --set-gtid-purged=OFF --add-drop-table > hotel.sql
 
@@ -102,7 +117,7 @@ vnpay:
 
 # Cấu hình cho Cloudflare R2 Storage
 r2:
-  bucket-name: "thangcachep-video" # <-- Tên bucket bạn đã tạo
+  bucket-name: "thangcachep-video"
 
   # Ghép Account ID vào đây
   endpoint: https://f0f2672db9148f22e73449d471512551.r2.cloudflarestorage.com
@@ -120,3 +135,12 @@ r2:
 #ten mien              https://pub-84089b75c7394683b414ceb19004efb8.r2.dev
 #Access Key ID        25f4de8a67520cbdf11d17ac0d8b8b47
 #Secret Access Key    fe614fb2cf286d1ca67e3dbb58233a6970a39c79e475cc30bbb9c3092779c83f
+
+
+# Google OAuth Configuration
+# Lấy Client ID và Client Secret từ: https://console.cloud.google.com/apis/credentials
+google:
+  oauth:
+    client-id: ${GOOGLE_CLIENT_ID:434551586297-ui85mak0euetf42dqrbgv8tu30pvotev.apps.googleusercontent.com}
+    client-secret: ${GOOGLE_CLIENT_SECRET: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}
+    redirect-uri: ${GOOGLE_REDIRECT_URI:http://localhost:5173/auth/google/callback}
