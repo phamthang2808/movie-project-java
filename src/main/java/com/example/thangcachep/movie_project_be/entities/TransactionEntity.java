@@ -42,8 +42,8 @@ public class TransactionEntity extends BaseEntity {
     @Column(length = 100)
     private String paymentMethod; // VNPAY, BANK_TRANSFER, MOMO
 
-    @Column(length = 255)
-    private String paymentId; // ID từ payment gateway
+    @Column(length = 255, unique = true)
+    private String paymentId; // ID từ payment gateway (unique để tránh trùng giao dịch)
 
     @Column(length = 500)
     private String paymentUrl; // URL thanh toán

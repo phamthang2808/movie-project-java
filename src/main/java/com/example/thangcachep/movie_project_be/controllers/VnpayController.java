@@ -2,6 +2,8 @@ package com.example.thangcachep.movie_project_be.controllers;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -9,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.example.thangcachep.movie_project_be.entities.UserEntity;
 import com.example.thangcachep.movie_project_be.models.request.VnpayRequest;
 import com.example.thangcachep.movie_project_be.services.impl.VnpayService;
 
@@ -33,12 +36,25 @@ public class VnpayController {
     public ResponseEntity<String> createPayment(@RequestBody VnpayRequest paymentRequest) {
         try {
             log.info("📨 Nhận request tạo VNPay payment - Số tiền: {} VND", paymentRequest.getAmount());
-            
-            String paymentUrl = vnpayService.createPayment(paymentRequest);
-            
+
+            // Lấy userId từ SecurityContext để lưu vào OrderInfo
+            Long userId = null;
+            try {
+                Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+                if (authentication != null && authentication.getPrincipal() instanceof UserEntity) {
+                    UserEntity user = (UserEntity) authentication.getPrincipal();
+                    userId = user.getId();
+                    log.info("VNPay create: Lấy userId từ SecurityContext: {}", userId);
+                }
+            } catch (Exception e) {
+                log.warn("VNPay create: Không thể lấy userId từ SecurityContext: {}", e.getMessage());
+            }
+
+            String paymentUrl = vnpayService.createPayment(paymentRequest, userId);
+
             log.info("✅ Trả về payment URL cho client");
             return ResponseEntity.ok(paymentUrl);
-            
+
         } catch (IllegalArgumentException e) {
             log.error("❌ Lỗi validate: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
@@ -55,14 +71,44 @@ public class VnpayController {
      */
     @GetMapping("/return")
     public ResponseEntity<?> vnpReturn(@RequestParam Map<String, String> params) {
-        return vnpayService.verifyAndProcess(params, false);
+        // Lấy userId từ SecurityContext (nếu user đã đăng nhập)
+        // Nếu không có, sẽ parse từ OrderInfo trong verifyAndProcess()
+        Long userId = null;
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication != null && authentication.getPrincipal() instanceof UserEntity) {
+                UserEntity user = (UserEntity) authentication.getPrincipal();
+                userId = user.getId();
+                log.info("VNPay return: Lấy userId từ SecurityContext: {}", userId);
+            }
+        } catch (Exception e) {
+            log.debug("VNPay return: Không thể lấy userId từ SecurityContext (sẽ parse từ OrderInfo): {}", e.getMessage());
+        }
+
+        return vnpayService.verifyAndProcess(params, false, userId);
     }
 
     // IPN URL (server-to-server, dùng để chốt giao dịch, độ tin cậy cao)
     @GetMapping("/ipn")
     public ResponseEntity<String> vnpIpn(@RequestParam Map<String, String> params) {
+        // IPN không có authentication, cần parse userId từ OrderInfo
+        // Ví dụ: "USER_123_ORDER_71082970" -> userId = 123
+        Long userId = null;
+        try {
+            String orderInfo = params.get("vnp_OrderInfo");
+            if (orderInfo != null && orderInfo.contains("USER_")) {
+                String[] parts = orderInfo.split("_");
+                if (parts.length >= 2) {
+                    userId = Long.parseLong(parts[1]);
+                    log.info("VNPay IPN: Parse userId từ OrderInfo: {}", userId);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("VNPay IPN: Không thể parse userId từ OrderInfo: {}", e.getMessage());
+        }
+
         // Theo spec VNPay, IPN nên trả về chuỗi (OK/ERROR...) – tuỳ yêu cầu bạn có thể thay đổi
-        return vnpayService.verifyAndProcess(params, true).getStatusCode().is2xxSuccessful()
+        return vnpayService.verifyAndProcess(params, true, userId).getStatusCode().is2xxSuccessful()
                 ? ResponseEntity.ok("OK")
                 : ResponseEntity.status(HttpStatus.BAD_REQUEST).body("ERROR");
     }

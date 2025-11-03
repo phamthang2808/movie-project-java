@@ -29,6 +29,7 @@ import com.example.thangcachep.movie_project_be.models.responses.AuthResponse;
 import com.example.thangcachep.movie_project_be.models.responses.UserResponse;
 import com.example.thangcachep.movie_project_be.repositories.RoleRepository;
 import com.example.thangcachep.movie_project_be.repositories.UserRepository;
+import com.example.thangcachep.movie_project_be.services.impl.UserService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -42,6 +43,7 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
     private final EmailService emailService;
+    private final UserService userService;
     private final RestTemplate restTemplate = new RestTemplate();
 
     @Value("${google.oauth.client-id:}")
@@ -295,6 +297,9 @@ public class AuthService {
 
 
     private UserResponse mapToUserResponse(UserEntity user) {
+        // Tự động check VIP expiration trước khi trả về response
+        userService.checkAndUpdateVipExpiration(user);
+
         return UserResponse.builder()
                 .id(user.getId())
                 .email(user.getEmail())

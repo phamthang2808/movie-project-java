@@ -5,35 +5,43 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TimeZone;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.example.thangcachep.movie_project_be.config.VnPayConfig;
+import com.example.thangcachep.movie_project_be.entities.TransactionEntity;
+import com.example.thangcachep.movie_project_be.entities.UserEntity;
 import com.example.thangcachep.movie_project_be.models.request.VnpayRequest;
+import com.example.thangcachep.movie_project_be.repositories.TransactionRepository;
+import com.example.thangcachep.movie_project_be.repositories.UserRepository;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class VnpayService {
 
-    // TODO: Inject repo/service thực để cộng tiền và kiểm tra trùng giao dịch
-    // private final UserService userService;
-    // private final TransactionRepository transactionRepository;
+    private final UserRepository userRepository;
+    private final TransactionRepository transactionRepository;
 
 
-    public String createPayment(VnpayRequest paymentRequest) throws UnsupportedEncodingException {
-        log.info("📝 Bắt đầu tạo payment VNPay - Số tiền: {} VND", paymentRequest.getAmount());
+    public String createPayment(VnpayRequest paymentRequest, Long userId) throws UnsupportedEncodingException {
+        log.info("📝 Bắt đầu tạo payment VNPay - Số tiền: {} VND, UserId: {}", paymentRequest.getAmount(), userId);
         String vnp_Version = "2.1.0";
         String vnp_Command = "pay";
         String orderType = "other";
@@ -48,15 +56,22 @@ public class VnpayService {
         }
 
         // Sử dụng bankCode từ request, mặc định là BIDV nếu không có
-        String bankCode = (paymentRequest.getBankCode() != null && !paymentRequest.getBankCode().isEmpty()) 
-                ? paymentRequest.getBankCode() 
+        String bankCode = (paymentRequest.getBankCode() != null && !paymentRequest.getBankCode().isEmpty())
+                ? paymentRequest.getBankCode()
                 : "BIDV";
-        
+
         log.info("🏦 Ngân hàng được chọn: {}", bankCode);
-        
+
         String vnp_TxnRef = VnPayConfig.getRandomNumber(8);
         String vnp_IpAddr = "127.0.0.1";
         String vnp_TmnCode = VnPayConfig.vnp_TmnCode;
+
+        // Encode userId vào OrderInfo để có thể lấy lại khi verify
+        String orderInfo = "Thanh toan don hang:" + vnp_TxnRef;
+        if (userId != null) {
+            orderInfo = "USER_" + userId + "_ORDER_" + vnp_TxnRef;
+            log.info("🔐 Đã encode userId {} vào OrderInfo", userId);
+        }
 
         Map<String, String> vnp_Params = new HashMap<>();
         vnp_Params.put("vnp_Version", vnp_Version);
@@ -67,7 +82,7 @@ public class VnpayService {
 
         vnp_Params.put("vnp_BankCode", bankCode);
         vnp_Params.put("vnp_TxnRef", vnp_TxnRef);
-        vnp_Params.put("vnp_OrderInfo", "Thanh toan don hang:" + vnp_TxnRef);
+        vnp_Params.put("vnp_OrderInfo", orderInfo);
         vnp_Params.put("vnp_OrderType", orderType);
         vnp_Params.put("vnp_Locale", "vn");
         vnp_Params.put("vnp_ReturnUrl", VnPayConfig.vnp_ReturnUrl);
@@ -106,15 +121,16 @@ public class VnpayService {
 
         String vnp_SecureHash = VnPayConfig.hmacSHA512(VnPayConfig.vnp_SecretKey, hashData.toString());
         query.append("&vnp_SecureHash=").append(vnp_SecureHash);
-        
+
         String paymentUrl = VnPayConfig.vnp_PayUrl + "?" + query;
         log.info("✅ Tạo VNPay payment URL thành công - Mã giao dịch: {}", vnp_TxnRef);
         log.debug("🔗 Payment URL: {}", paymentUrl);
-        
+
         return paymentUrl;
     }
 
-    public ResponseEntity<?> verifyAndProcess(Map<String, String> params, boolean isIpn) {
+    @Transactional
+    public ResponseEntity<?> verifyAndProcess(Map<String, String> params, boolean isIpn, Long userId) {
         try {
             // 1) Lấy secure hash và tạo bản sao fields để tính lại hash
             String secureHash = params.get("vnp_SecureHash");
@@ -157,20 +173,102 @@ public class VnpayService {
             String txnNo = params.get("vnp_TransactionNo");
             long amountVnd = Long.parseLong(params.getOrDefault("vnp_Amount", "0")) / 100;
 
-            // 6) Idempotent – tránh cộng tiền trùng (pseudo)
-            // if (transactionRepository.existsByTxnNo(txnNo)) {
-            //     return ResponseEntity.ok("ALREADY_PROCESSED");
-            // }
+            // 5.5) IDEMPOTENT CHECK - Kiểm tra trùng giao dịch để tránh double payment
+            Optional<TransactionEntity> existingTransaction = transactionRepository.findByPaymentId(txnNo);
+            if (existingTransaction.isPresent()) {
+                TransactionEntity existing = existingTransaction.get();
+                log.warn("VNPay: Giao dịch đã được xử lý trước đó - TxnNo: {}, Status: {}, Amount: {} VND",
+                        txnNo, existing.getStatus(), existing.getAmount());
 
-            // 7) Cộng tiền/hoặc kích hoạt VIP cho user tương ứng
-            // long userId = ... (lấy từ order ứng với txnRef)
-            // userService.addBalance(userId, amountVnd);
-            // transactionRepository.save(new Transaction(txnNo, txnRef, amountVnd, SUCCESS, ...));
+                // Nếu transaction đã completed, return success nhưng không cộng tiền nữa
+                if (existing.getStatus() == TransactionEntity.TransactionStatus.COMPLETED) {
+                    log.info("VNPay: Transaction {} đã completed, bỏ qua xử lý (idempotent)", txnNo);
+                    Map<String, Object> response = new HashMap<>();
+                    response.put("message", "Giao dịch đã được xử lý trước đó");
+                    response.put("success", true);
+                    response.put("amount", existing.getAmount());
+                    response.put("transactionNo", txnNo);
+                    response.put("alreadyProcessed", true);
+                    return ResponseEntity.ok(response);
+                }
+            }
 
-            log.info("VNPay: xử lý thành công TxnRef={}, TxnNo={}, amount={} VND, ipn={}",
-                    txnRef, txnNo, amountVnd, isIpn);
+            // 6) Lấy userId từ OrderInfo nếu chưa có từ SecurityContext
+            if (userId == null) {
+                String orderInfo = params.get("vnp_OrderInfo");
+                if (orderInfo != null && orderInfo.contains("USER_")) {
+                    try {
+                        String[] parts = orderInfo.split("_");
+                        if (parts.length >= 2) {
+                            userId = Long.parseLong(parts[1]);
+                            log.info("VNPay: Parse userId từ OrderInfo: {}", userId);
+                        }
+                    } catch (NumberFormatException e) {
+                        log.warn("VNPay: Không thể parse userId từ OrderInfo: {}", orderInfo);
+                    }
+                }
+            }
 
-            return ResponseEntity.ok("PAYMENT_OK");
+            if (userId == null) {
+                log.error("VNPay: Không thể xác định userId từ request hoặc OrderInfo");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body("CANNOT_IDENTIFY_USER");
+            }
+
+            // 7) Lấy user và cập nhật số dư
+            Optional<UserEntity> userOpt = userRepository.findById(userId);
+            if (userOpt.isEmpty()) {
+                log.error("VNPay: Không tìm thấy user với ID: {}", userId);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body("USER_NOT_FOUND");
+            }
+
+            UserEntity user = userOpt.get();
+            double currentBalance = user.getBalance() != null ? user.getBalance() : 0.0;
+            double newBalance = currentBalance + amountVnd;
+            user.setBalance(newBalance);
+            userRepository.save(user);
+
+            log.info("VNPay: Đã cộng {} VND vào số dư user {} (số dư cũ: {} VND, số dư mới: {} VND)",
+                    amountVnd, userId, currentBalance, newBalance);
+
+            // 8) Lưu transaction vào database để tránh trùng giao dịch sau này
+            try {
+                TransactionEntity transaction = TransactionEntity.builder()
+                        .user(user)
+                        .type(TransactionEntity.TransactionType.RECHARGE)
+                        .status(TransactionEntity.TransactionStatus.COMPLETED)
+                        .amount((double) amountVnd)
+                        .description("Nạp tiền qua VNPay - Mã GD: " + txnRef)
+                        .paymentMethod("VNPAY")
+                        .paymentId(txnNo) // Lưu vnp_TransactionNo để check trùng
+                        .completedAt(LocalDateTime.now())
+                        .build();
+                transactionRepository.save(transaction);
+                log.info("VNPay: Đã lưu transaction vào database - TxnNo: {}, TxnRef: {}", txnNo, txnRef);
+            } catch (Exception e) {
+                // Nếu có unique constraint violation (race condition), kiểm tra lại
+                Optional<TransactionEntity> duplicateCheck = transactionRepository.findByPaymentId(txnNo);
+                if (duplicateCheck.isPresent()) {
+                    log.warn("VNPay: Transaction {} đã được xử lý bởi request khác (race condition), rollback balance", txnNo);
+                    // Rollback balance nếu transaction đã tồn tại
+                    user.setBalance(currentBalance);
+                    userRepository.save(user);
+                    log.info("VNPay: Đã rollback balance cho user {} về {}", userId, currentBalance);
+                }
+                // Nếu là lỗi khác, vẫn log nhưng không rollback (vì có thể đã commit)
+                log.error("VNPay: Lỗi khi lưu transaction - TxnNo: {}, Error: {}", txnNo, e.getMessage());
+            }
+            log.info("VNPay: xử lý thành công TxnRef={}, TxnNo={}, amount={} VND, userId={}, ipn={}",
+                    txnRef, txnNo, amountVnd, userId, isIpn);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Thanh toán thành công!");
+            response.put("success", true);
+            response.put("amount", amountVnd);
+            response.put("transactionNo", txnNo);
+
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             log.error("VNPay verify error: ", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("SERVER_ERROR");
