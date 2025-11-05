@@ -1,9 +1,19 @@
 package com.example.thangcachep.movie_project_be.entities;
 
-import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.Set;
+
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -69,6 +79,10 @@ public class MovieEntity extends BaseEntity {
     @Column(nullable = false)
     private Boolean isActive = true;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private MovieStatus status = MovieStatus.UPCOMING;
+
     // Relationships
     @ManyToMany(cascade = {CascadeType.PERSIST, CascadeType.MERGE})
     @JoinTable(
@@ -99,5 +113,12 @@ public class MovieEntity extends BaseEntity {
     // Enum cho MovieType
     public enum MovieType {
         MOVIE, SERIES
+    }
+
+    // Enum cho MovieStatus
+    public enum MovieStatus {
+        UPCOMING,    // Sắp chiếu
+        AIRING,      // Đang chiếu
+        COMPLETED    // Hoàn thành
     }
 }

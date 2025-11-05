@@ -1,20 +1,20 @@
 package com.example.thangcachep.movie_project_be.models.responses;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.List;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class MovieResponse {
-    
+
     private Long id;
     private String title;
     private String description;
@@ -23,6 +23,7 @@ public class MovieResponse {
     private String trailerUrl;
     private String videoUrl;
     private String type; // MOVIE, SERIES
+    private String status; // UPCOMING, AIRING, COMPLETED
     private Integer duration;
     private LocalDate releaseDate;
     private Double rating;

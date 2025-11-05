@@ -63,8 +63,49 @@ public class FileStorageService {
         return publicUrl + "/" + uniqueFileName;
     }
 
-//    private final FileUploadProperties fileUploadProperties;
-//
+    @Autowired(required = false)
+    private FileUploadProperties fileUploadProperties;
+
+    /**
+     * Upload avatar vào thư mục uploads local và trả về URL
+     */
+    public String uploadAvatarToLocal(MultipartFile file) throws IOException {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("File cannot be null or empty");
+        }
+
+        String originalFilename = file.getOriginalFilename();
+        String filename = originalFilename != null ? StringUtils.cleanPath(originalFilename) : "";
+        String fileExtension = "";
+        if (filename != null && !filename.isEmpty() && filename.contains(".")) {
+            fileExtension = filename.substring(filename.lastIndexOf("."));
+        }
+        // Thêm UUID vào trước tên file để đảm bảo tên file là duy nhất
+        String uniqueFilename = UUID.randomUUID().toString() + fileExtension;
+
+        // Đường dẫn đến thư mục uploads/avatars (tạo trong project root hoặc từ fileUploadProperties)
+        Path uploadDir;
+        if (fileUploadProperties != null && fileUploadProperties.getUploadDir() != null) {
+            uploadDir = Paths.get(fileUploadProperties.getUploadDir(), "avatars");
+        } else {
+            uploadDir = Paths.get("uploads", "avatars");
+        }
+
+        // Kiểm tra và tạo thư mục nếu nó không tồn tại
+        if (!Files.exists(uploadDir)) {
+            Files.createDirectories(uploadDir);
+        }
+
+        // Đường dẫn đầy đủ đến file
+        Path destination = uploadDir.resolve(uniqueFilename);
+
+        // Sao chép file vào thư mục đích
+        Files.copy(file.getInputStream(), destination, StandardCopyOption.REPLACE_EXISTING);
+
+        // Trả về URL: /uploads/avatars/filename
+        return "/uploads/avatars/" + uniqueFilename;
+    }
+
 //    /**
 //     * Lưu file vào thư mục upload và trả về tên file duy nhất
 //     */

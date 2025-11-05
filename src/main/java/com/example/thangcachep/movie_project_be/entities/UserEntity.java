@@ -1,5 +1,6 @@
 package com.example.thangcachep.movie_project_be.entities;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -60,6 +61,12 @@ public class UserEntity extends BaseEntity implements UserDetails {
 
     @Column(nullable = false)
     private Boolean isActive = true;
+
+    @Column(length = 20)
+    private String phone;
+
+    @Column
+    private LocalDate birthday;
 
     // Relationships
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)

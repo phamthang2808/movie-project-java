@@ -57,6 +57,7 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
+                    .requestMatchers("/api/v1/upload/**").permitAll()
                     .requestMatchers("/api/v1/vnpay/**").permitAll()
                     .requestMatchers("/api/v1/chat/**").permitAll()
                 .requestMatchers("/api/v1/auth/**").permitAll()

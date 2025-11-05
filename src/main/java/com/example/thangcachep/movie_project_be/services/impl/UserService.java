@@ -53,9 +53,24 @@ public class UserService {
         if (request.getName() != null) {
             user.setName(request.getName());
         }
-        if (request.getEmail() != null) {
-            user.setEmail(request.getEmail());
+        // Email không cho phép thay đổi qua profile update
+        // if (request.getEmail() != null) {
+        //     user.setEmail(request.getEmail());
+        // }
+
+        if (request.getPhone() != null) {
+            user.setPhone(request.getPhone());
+        } else if (request.getPhone() == null && user.getPhone() != null) {
+            // Cho phép xóa phone nếu gửi null
+            user.setPhone(null);
         }
+
+        // Birthday - luôn update nếu có trong request (kể cả null để xóa)
+        user.setBirthday(request.getBirthday());
+
+        // Lưu user sau khi update
+        userRepository.save(user);
+
         // Note: avatar update should be handled separately via upload endpoint
 
         return mapToUserResponse(user);
@@ -89,6 +104,8 @@ public class UserService {
                 .isEmailVerified(user.getIsEmailVerified())
                 .isActive(user.getIsActive())
                 .createdAt(user.getCreatedAt())
+                .phone(user.getPhone())
+                .birthday(user.getBirthday())
                 .build();
     }
 }

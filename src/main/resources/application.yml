@@ -25,8 +25,8 @@ spring:
   servlet:
     multipart:
       enabled: true # <-- ĐÃ THÊM
-      max-file-size: 10MB
-      max-request-size: 10MB
+      max-file-size: 2GB
+      max-request-size: 2GB
   messages:
     basename: i18n/messages
     encoding: UTF-8

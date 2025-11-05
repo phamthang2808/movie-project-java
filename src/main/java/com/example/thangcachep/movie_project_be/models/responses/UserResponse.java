@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
@@ -12,7 +13,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 public class UserResponse {
-    
+
     private Long id;
     private String email;
     private String name;
@@ -24,6 +25,8 @@ public class UserResponse {
     private Boolean isEmailVerified;
     private Boolean isActive;
     private LocalDateTime createdAt;
+    private String phone;
+    private LocalDate birthday;
 }
 
 
