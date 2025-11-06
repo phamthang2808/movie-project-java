@@ -61,6 +61,12 @@ spring:
           starttls:
             enable: true
             required: true
+  # ==========================================
+  # SPRING BEAN OVERRIDING (Cho phép override bean nếu trùng tên)
+  # ==========================================
+  main:
+    allow-bean-definition-overriding: true
+
 api:
   prefix: /api/v1
 
@@ -144,3 +150,21 @@ google:
     client-id: ${GOOGLE_CLIENT_ID:434551586297-ui85mak0euetf42dqrbgv8tu30pvotev.apps.googleusercontent.com}
     client-secret: ${GOOGLE_CLIENT_SECRET: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}
     redirect-uri: ${GOOGLE_REDIRECT_URI:http://localhost:5173/auth/google/callback}
+
+
+
+aws:
+  s3:
+    # AWS S3 Access Key
+    access-key: AKIAQDKYV3PZTWGVQLGI
+    # AWS S3 Secret Key
+    secret-key: 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
+    # AWS S3 Region (ví dụ: us-east-1, ap-southeast-1)
+    region: ap-southeast-2
+    # AWS S3 Bucket Name
+    bucket-name: movie-bucket-java
+    # AWS S3 Public URL
+    # Nếu dùng S3 trực tiếp:
+    public-url: https://movie-bucket-java.s3.ap-southeast-2.amazonaws.com
+    # Hoặc nếu dùng CloudFront CDN (uncomment và sửa):
+    # public-url: https://your-cloudfront-domain.cloudfront.net

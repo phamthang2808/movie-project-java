@@ -20,7 +20,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.example.thangcachep.movie_project_be.entities.UserEntity;
 import com.example.thangcachep.movie_project_be.models.responses.UserResponse;
 import com.example.thangcachep.movie_project_be.repositories.UserRepository;
-import com.example.thangcachep.movie_project_be.services.impl.FileStorageService;
+import com.example.thangcachep.movie_project_be.services.impl.BucketService;
 import com.example.thangcachep.movie_project_be.services.impl.UserService;
 
 import lombok.RequiredArgsConstructor;
@@ -33,7 +33,7 @@ public class UserController {
 
     private final UserService userService;
     private final UserRepository userRepository;
-    private final FileStorageService fileStorageService;
+    private final BucketService bucketService;
 
     @GetMapping("/profile")
     public ResponseEntity<UserResponse> getProfile() {
@@ -78,9 +78,8 @@ public class UserController {
                         .body(Map.of("success", false, "message", "Ảnh không được vượt quá 5MB"));
             }
 
-            // Upload file lên Cloudflare R2 (khuyến nghị cho production)
-            // Hoặc có thể dùng uploadAvatarToLocal(file) để lưu local nếu cần
-            String avatarUrl = fileStorageService.uploadFile(file);
+            // Upload file lên AWS S3
+            String avatarUrl = bucketService.uploadFile(file);
 
             // Update user avatar
             user.setAvatarUrl(avatarUrl);
