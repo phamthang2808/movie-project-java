@@ -6,6 +6,8 @@ import java.util.Map;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,11 +19,16 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.example.thangcachep.movie_project_be.entities.UserEntity;
 import com.example.thangcachep.movie_project_be.exceptions.DataNotFoundException;
+import com.example.thangcachep.movie_project_be.models.request.CommentRequest;
 import com.example.thangcachep.movie_project_be.models.request.MovieRequest;
+import com.example.thangcachep.movie_project_be.models.responses.CommentResponse;
 import com.example.thangcachep.movie_project_be.models.responses.MovieResponse;
+import com.example.thangcachep.movie_project_be.services.impl.CommentService;
 import com.example.thangcachep.movie_project_be.services.impl.MovieService;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -31,6 +38,7 @@ import lombok.RequiredArgsConstructor;
 public class MovieController {
 
     private final MovieService movieService;
+    private final CommentService commentService;
 
     @GetMapping
     public ResponseEntity<Page<MovieResponse>> getAllMovies(
@@ -54,6 +62,23 @@ public class MovieController {
     ) {
         List<MovieResponse> movies = movieService.getAllMoviesWithoutPagination(includeInactive);
         return ResponseEntity.ok(movies);
+    }
+
+    /**
+     * Lấy danh sách comments của một phim
+     * GET /api/v1/movies/{movieId}/comments
+     * Đặt trước /{id} để tránh conflict routing
+     */
+    @GetMapping("/{movieId}/comments")
+    public ResponseEntity<List<CommentResponse>> getMovieComments(@PathVariable Long movieId) {
+        try {
+            List<CommentResponse> comments = commentService.getMovieComments(movieId);
+            return ResponseEntity.ok(comments);
+        } catch (DataNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
     }
 
     @GetMapping("/{id}")
@@ -138,6 +163,65 @@ public class MovieController {
             return ResponseEntity.notFound().build();
         } catch (Exception e) {
             return ResponseEntity.badRequest().build();
+        }
+    }
+
+    /**
+     * Thêm comment cho một phim
+     * POST /api/v1/movies/{movieId}/comments
+     * Yêu cầu authentication (user phải đăng nhập)
+     */
+    @PostMapping("/{movieId}/comments")
+    public ResponseEntity<?> addComment(
+            @PathVariable Long movieId,
+            @RequestBody @Valid CommentRequest request
+    ) {
+        try {
+            // Lấy user hiện tại từ SecurityContext
+            UserEntity user = getCurrentUser();
+
+            if (user == null) {
+                return ResponseEntity.status(401).body(Map.of("error", "Unauthorized", "message", "Bạn phải đăng nhập để bình luận"));
+            }
+
+            CommentResponse comment = commentService.createComment(movieId, request, user);
+            return ResponseEntity.ok(comment);
+        } catch (DataNotFoundException e) {
+            return ResponseEntity.status(404).body(Map.of("error", "Not Found", "message", e.getMessage()));
+        } catch (ClassCastException | NullPointerException e) {
+            // Lỗi khi không có authentication
+            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized", "message", "Bạn phải đăng nhập để bình luận"));
+        } catch (Exception e) {
+            e.printStackTrace(); // Log error để debug
+            return ResponseEntity.status(400).body(Map.of("error", "Bad Request", "message", e.getMessage()));
+        }
+    }
+
+    /**
+     * Lấy user hiện tại từ SecurityContext
+     * @return UserEntity nếu đã đăng nhập, null nếu chưa đăng nhập
+     */
+    private UserEntity getCurrentUser() {
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null || authentication.getPrincipal() == null) {
+                return null;
+            }
+
+            // Kiểm tra xem principal có phải là UserEntity không
+            Object principal = authentication.getPrincipal();
+            if (principal instanceof UserEntity) {
+                return (UserEntity) principal;
+            }
+
+            // Nếu principal là String (anonymous user), return null
+            if (principal instanceof String && principal.equals("anonymousUser")) {
+                return null;
+            }
+
+            return null;
+        } catch (Exception e) {
+            return null;
         }
     }
 }

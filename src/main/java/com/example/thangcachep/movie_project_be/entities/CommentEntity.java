@@ -1,6 +1,11 @@
 package com.example.thangcachep.movie_project_be.entities;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -36,8 +41,14 @@ public class CommentEntity extends BaseEntity {
     private CommentEntity parent; // Cho phép reply comment
 
     @Column(nullable = false)
+    @Builder.Default
     private Integer likeCount = 0;
 
     @Column(nullable = false)
+    @Builder.Default
     private Boolean isActive = true;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean isAnonymous = false; // true nếu ẩn danh, false nếu không
 }
