@@ -13,15 +13,18 @@ spring:
     username: root
     password: ${MYSQL_ROOT_PASSWORD:ELmYQuCJJkWotiqVTypaKLFbBvVrbzwm}
   jpa:
-    show-sql: true
+#    show-sql: true
+    show-sql: false
     hibernate:
-      ddl-auto: update
+      ddl-auto: none
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL8Dialect
-        format_sql: true
+#        format_sql: true
+        format_sql: false
         highlight_sql: true # (Hibernate 6+) tô màu SQL trong console
-        use_sql_comments: true # thêm comment cho câu SQL
+#        use_sql_comments: true # thêm comment cho câu SQL
+        use_sql_comments: false
   servlet:
     multipart:
       enabled: true # <-- ĐÃ THÊM

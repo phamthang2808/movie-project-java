@@ -244,6 +244,37 @@ public class MovieService {
             }
         }
 
+        // Cập nhật categories nếu có categoryIds trong updates
+        if (updates.containsKey("categoryIds")) {
+            Object categoryIdsObj = updates.get("categoryIds");
+            if (categoryIdsObj instanceof List) {
+                @SuppressWarnings("unchecked")
+                List<Object> categoryIdsList = (List<Object>) categoryIdsObj;
+                Set<CategoryEntity> categories = new HashSet<>();
+
+                for (Object categoryIdObj : categoryIdsList) {
+                    Long categoryId = null;
+                    if (categoryIdObj instanceof Number) {
+                        categoryId = ((Number) categoryIdObj).longValue();
+                    } else if (categoryIdObj instanceof String) {
+                        try {
+                            categoryId = Long.parseLong((String) categoryIdObj);
+                        } catch (NumberFormatException e) {
+                            // Skip invalid category ID
+                            continue;
+                        }
+                    }
+
+                    if (categoryId != null) {
+                        categoryRepository.findById(categoryId).ifPresent(categories::add);
+                    }
+                }
+
+                movie.setCategories(categories);
+                System.out.println("Setting categories: " + categories.size() + " categories");
+            }
+        }
+
         // Lưu vào database
         movie = movieRepository.save(movie);
 
