@@ -33,10 +33,17 @@ public class MovieService {
         Page<MovieEntity> movies;
 
         if (categoryId != null) {
+            // findByCategoryId đã filter isActive = true
             movies = movieRepository.findByCategoryId(categoryId, pageable);
         } else if (type != null) {
             MovieEntity.MovieType movieType = MovieEntity.MovieType.valueOf(type.toUpperCase());
-            movies = movieRepository.findByType(movieType, pageable);
+            // Nếu includeInactive = true, lấy cả phim inactive
+            if (includeInactive != null && includeInactive) {
+                movies = movieRepository.findByType(movieType, pageable);
+            } else {
+                // Mặc định chỉ lấy phim active
+                movies = movieRepository.findByTypeAndIsActiveTrue(movieType, pageable);
+            }
         } else {
             // Nếu includeInactive = true, lấy tất cả (kể cả inactive)
             if (includeInactive != null && includeInactive) {
@@ -53,17 +60,20 @@ public class MovieService {
      * Lấy tất cả phim không phân trang (dùng cho admin)
      * Mặc định chỉ lấy phim active (isActive = true)
      * Nếu includeInactive = true, mới lấy cả phim đã xóa
+     *
+     * Tối ưu: Sử dụng JOIN FETCH để load categories cùng lúc, tránh N+1 query problem
      */
     public List<MovieResponse> getAllMoviesWithoutPagination(Boolean includeInactive) {
         List<MovieEntity> movies;
 
         // Mặc định chỉ lấy phim active (isActive = true)
+        // Sử dụng query đã tối ưu với JOIN FETCH để load categories
         if (includeInactive != null && includeInactive) {
             // Nếu cần lấy cả phim đã xóa (soft delete)
-            movies = movieRepository.findAll();
+            movies = movieRepository.findAllWithCategories();
         } else {
-            // Chỉ lấy phim active
-            movies = movieRepository.findByIsActiveTrue();
+            // Chỉ lấy phim active với categories đã được fetch
+            movies = movieRepository.findByIsActiveTrueWithCategories();
         }
 
         return movies.stream()
@@ -72,7 +82,8 @@ public class MovieService {
     }
 
     public MovieResponse getMovieById(Long id) {
-        MovieEntity movie = movieRepository.findById(id)
+        // Sử dụng query tối ưu với JOIN FETCH để load categories cùng lúc
+        MovieEntity movie = movieRepository.findByIdWithCategories(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy phim với ID: " + id));
         return mapToMovieResponse(movie);
     }
