@@ -20,6 +20,7 @@ public class CommentResponse {
     private String author; // Tên user hoặc "Ẩn danh"
     private String avatar; // Avatar URL hoặc null
     private Integer likeCount;
+    private Boolean isLiked; // true nếu user hiện tại đã like comment này
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private List<CommentResponse> replies; // Danh sách replies

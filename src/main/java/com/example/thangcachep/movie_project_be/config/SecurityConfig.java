@@ -62,6 +62,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/vnpay/**").permitAll()
                         .requestMatchers("/api/v1/chat/**").permitAll()
                         .requestMatchers("/api/v1/auth/**").permitAll()
+                        .requestMatchers("/api/v1/upload/**").hasAnyRole("ADMIN", "STAFF")
                         // Tất cả GET movies và GET comments: public
                         // POST comments sẽ check authentication trong controller
                         .requestMatchers("/api/v1/movies/**").permitAll()

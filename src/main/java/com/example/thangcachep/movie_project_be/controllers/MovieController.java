@@ -72,7 +72,11 @@ public class MovieController {
     @GetMapping("/{movieId}/comments")
     public ResponseEntity<List<CommentResponse>> getMovieComments(@PathVariable Long movieId) {
         try {
-            List<CommentResponse> comments = commentService.getMovieComments(movieId);
+            // Lấy user hiện tại (có thể null nếu chưa đăng nhập)
+            UserEntity currentUser = getCurrentUser();
+            Long userId = currentUser != null ? currentUser.getId() : null;
+
+            List<CommentResponse> comments = commentService.getMovieComments(movieId, userId);
             return ResponseEntity.ok(comments);
         } catch (DataNotFoundException e) {
             return ResponseEntity.notFound().build();
@@ -222,6 +226,46 @@ public class MovieController {
             return null;
         } catch (Exception e) {
             return null;
+        }
+    }
+
+    /**
+     * Toggle like/unlike một comment
+     * POST /api/v1/movies/{movieId}/comments/{commentId}/like
+     * Yêu cầu authentication (user phải đăng nhập)
+     * Like nếu chưa like, unlike nếu đã like
+     */
+    @PostMapping("/{movieId}/comments/{commentId}/like")
+    public ResponseEntity<?> toggleLikeComment(
+            @PathVariable Long movieId,
+            @PathVariable Long commentId
+    ) {
+        try {
+            // Kiểm tra movie có tồn tại không
+            try {
+                movieService.getMovieById(movieId);
+            } catch (DataNotFoundException e) {
+                return ResponseEntity.status(404).body(Map.of("error", "Not Found", "message", "Không tìm thấy phim"));
+            }
+
+            // Lấy user hiện tại (phải có, không thể null)
+            UserEntity currentUser = getCurrentUser();
+
+            // Kiểm tra user đã đăng nhập chưa
+            if (currentUser == null) {
+                return ResponseEntity.status(401).body(Map.of("error", "Unauthorized", "message", "Bạn phải đăng nhập để like comment"));
+            }
+
+            CommentResponse comment = commentService.toggleLikeComment(commentId, currentUser);
+            return ResponseEntity.ok(comment);
+        } catch (DataNotFoundException e) {
+            return ResponseEntity.status(404).body(Map.of("error", "Not Found", "message", e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            // Lỗi validation (ví dụ: chưa đăng nhập)
+            return ResponseEntity.status(400).body(Map.of("error", "Bad Request", "message", e.getMessage()));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(400).body(Map.of("error", "Bad Request", "message", e.getMessage()));
         }
     }
 }

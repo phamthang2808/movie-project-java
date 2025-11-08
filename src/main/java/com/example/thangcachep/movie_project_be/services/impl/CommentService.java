@@ -7,11 +7,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.example.thangcachep.movie_project_be.entities.CommentEntity;
+import com.example.thangcachep.movie_project_be.entities.CommentLikeEntity;
 import com.example.thangcachep.movie_project_be.entities.MovieEntity;
 import com.example.thangcachep.movie_project_be.entities.UserEntity;
 import com.example.thangcachep.movie_project_be.exceptions.DataNotFoundException;
 import com.example.thangcachep.movie_project_be.models.request.CommentRequest;
 import com.example.thangcachep.movie_project_be.models.responses.CommentResponse;
+import com.example.thangcachep.movie_project_be.repositories.CommentLikeRepository;
 import com.example.thangcachep.movie_project_be.repositories.CommentRepository;
 import com.example.thangcachep.movie_project_be.repositories.MovieRepository;
 
@@ -23,6 +25,7 @@ public class CommentService {
 
     private final CommentRepository commentRepository;
     private final MovieRepository movieRepository;
+    private final CommentLikeRepository commentLikeRepository;
 
     /**
      * Tạo comment mới
@@ -62,14 +65,18 @@ public class CommentService {
         // Lưu comment
         comment = commentRepository.save(comment);
 
-        return mapToCommentResponse(comment);
+        // Trả về response với isLiked = false (comment mới tạo chưa được like)
+        Long userId = user != null ? user.getId() : null;
+        return mapToCommentResponse(comment, userId);
     }
 
     /**
      * Lấy danh sách comments của một phim
+     * @param movieId ID của phim
+     * @param userId ID của user hiện tại (có thể null nếu chưa đăng nhập)
      */
     @Transactional(readOnly = true)
-    public List<CommentResponse> getMovieComments(Long movieId) {
+    public List<CommentResponse> getMovieComments(Long movieId, Long userId) {
         // Kiểm tra movie có tồn tại không
         if (!movieRepository.existsById(movieId)) {
             throw new DataNotFoundException("Không tìm thấy phim với ID: " + movieId);
@@ -78,9 +85,9 @@ public class CommentService {
         // Lấy tất cả comments gốc (không có parent) và active
         List<CommentEntity> parentComments = commentRepository.findByMovieIdAndParentIsNullAndIsActive(movieId, true);
 
-        // Map sang CommentResponse và load replies
+        // Map sang CommentResponse và load replies, với thông tin isLiked
         return parentComments.stream()
-                .map(this::mapToCommentResponseWithReplies)
+                .map(comment -> mapToCommentResponseWithReplies(comment, userId))
                 .collect(Collectors.toList());
     }
 
@@ -117,19 +124,91 @@ public class CommentService {
 
     /**
      * Map CommentEntity sang CommentResponse với replies
+     * @param comment Comment entity
+     * @param userId ID của user hiện tại (có thể null)
      */
-    private CommentResponse mapToCommentResponseWithReplies(CommentEntity comment) {
-        CommentResponse response = mapToCommentResponse(comment);
+    private CommentResponse mapToCommentResponseWithReplies(CommentEntity comment, Long userId) {
+        CommentResponse response = mapToCommentResponse(comment, userId);
 
         // Lấy replies của comment này (chỉ lấy active)
         List<CommentEntity> replies = commentRepository.findByParentIdAndIsActive(comment.getId(), true);
         List<CommentResponse> replyResponses = replies.stream()
-                .map(this::mapToCommentResponse)
+                .map(reply -> mapToCommentResponse(reply, userId))
                 .collect(Collectors.toList());
 
         response.setReplies(replyResponses);
 
         return response;
+    }
+
+    /**
+     * Map CommentEntity sang CommentResponse (overload với userId)
+     */
+    private CommentResponse mapToCommentResponse(CommentEntity comment, Long userId) {
+        CommentResponse response = mapToCommentResponse(comment);
+
+        // Kiểm tra user đã like comment này chưa
+        if (userId != null) {
+            boolean isLiked = commentLikeRepository.findByUserIdAndCommentId(userId, comment.getId()).isPresent();
+            response.setIsLiked(isLiked);
+        } else {
+            response.setIsLiked(false);
+        }
+
+        return response;
+    }
+
+    /**
+     * Toggle like/unlike một comment (like nếu chưa like, unlike nếu đã like)
+     * @param commentId ID của comment
+     * @param user User đang like/unlike (bắt buộc phải có, không thể null)
+     * @return CommentResponse với isLiked = true nếu đã like, false nếu đã unlike
+     * @throws IllegalArgumentException nếu user == null
+     */
+    @Transactional
+    public CommentResponse toggleLikeComment(Long commentId, UserEntity user) {
+        CommentEntity comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new DataNotFoundException("Không tìm thấy comment với ID: " + commentId));
+
+        // Yêu cầu user phải đăng nhập
+        if (user == null) {
+            throw new IllegalArgumentException("Bạn phải đăng nhập để like comment");
+        }
+
+        // Kiểm tra user đã like comment này chưa
+        var commentLikeOpt = commentLikeRepository.findByUserIdAndCommentId(user.getId(), commentId);
+
+        if (commentLikeOpt.isPresent()) {
+            // Đã like rồi → unlike (xóa like)
+            CommentLikeEntity commentLike = commentLikeOpt.get();
+            commentLikeRepository.delete(commentLike);
+
+            // Giảm likeCount đi 1 (đảm bảo không âm)
+            int newLikeCount = Math.max(0, comment.getLikeCount() - 1);
+            comment.setLikeCount(newLikeCount);
+            comment = commentRepository.save(comment);
+
+            // Trả về comment với isLiked = false
+            CommentResponse response = mapToCommentResponse(comment, user.getId());
+            response.setIsLiked(false); // Đã unlike
+            return response;
+        } else {
+            // Chưa like → like (thêm like)
+            CommentLikeEntity commentLike = CommentLikeEntity.builder()
+                    .user(user)
+                    .comment(comment)
+                    .build();
+            commentLikeRepository.save(commentLike);
+
+            // Tăng likeCount lên 1
+            comment.setLikeCount(comment.getLikeCount() + 1);
+            comment = commentRepository.save(comment);
+
+            // Trả về comment với isLiked = true
+            CommentResponse response = mapToCommentResponse(comment, user.getId());
+            response.setIsLiked(true); // Đã like
+            return response;
+        }
     }
 }
 
