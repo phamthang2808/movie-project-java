@@ -60,6 +60,12 @@ public interface MovieRepository extends JpaRepository<MovieEntity, Long> {
      */
     @Query("SELECT DISTINCT m FROM MovieEntity m LEFT JOIN FETCH m.categories WHERE m.id = :id")
     Optional<MovieEntity> findByIdWithCategories(Long id);
+
+    /**
+     * Lấy nhiều phim theo list IDs với categories đã được fetch sẵn (tối ưu)
+     */
+    @Query("SELECT DISTINCT m FROM MovieEntity m LEFT JOIN FETCH m.categories WHERE m.id IN :ids")
+    List<MovieEntity> findByIdsWithCategories(List<Long> ids);
 }
 
 

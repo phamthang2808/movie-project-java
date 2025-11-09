@@ -4,18 +4,27 @@ import com.example.thangcachep.movie_project_be.entities.FavoriteEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface FavoriteRepository extends JpaRepository<FavoriteEntity, Long> {
-    
+
     Optional<FavoriteEntity> findByMovieIdAndUserId(Long movieId, Long userId);
-    
+
     Boolean existsByMovieIdAndUserId(Long movieId, Long userId);
-    
+
     Page<FavoriteEntity> findByUserId(Long userId, Pageable pageable);
+
+    /**
+     * Lấy list movie IDs từ favorites của user (tối ưu, không load entity)
+     */
+    @Query("SELECT f.movie.id FROM FavoriteEntity f WHERE f.user.id = :userId")
+    List<Long> findMovieIdsByUserId(@Param("userId") Long userId);
 }
 
 

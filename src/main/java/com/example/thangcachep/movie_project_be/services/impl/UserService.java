@@ -2,10 +2,12 @@ package com.example.thangcachep.movie_project_be.services.impl;
 
 import java.time.LocalDateTime;
 
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.example.thangcachep.movie_project_be.entities.UserEntity;
+import com.example.thangcachep.movie_project_be.models.request.ChangePasswordRequest;
 import com.example.thangcachep.movie_project_be.models.responses.UserResponse;
 import com.example.thangcachep.movie_project_be.repositories.UserRepository;
 
@@ -16,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
     /**
      * Kiểm tra và tự động cập nhật VIP status nếu đã hết hạn
@@ -107,6 +110,39 @@ public class UserService {
                 .phone(user.getPhone())
                 .birthday(user.getBirthday())
                 .build();
+    }
+
+    /**
+     * Đổi mật khẩu của user
+     * @param user UserEntity cần đổi mật khẩu
+     * @param request ChangePasswordRequest chứa oldPassword, newPassword, confirmPassword
+     * @throws IllegalArgumentException nếu mật khẩu cũ không đúng hoặc mật khẩu mới không khớp
+     */
+    @Transactional
+    public void changePassword(UserEntity user, ChangePasswordRequest request) {
+        // Kiểm tra mật khẩu cũ có đúng không
+        // Nếu user đăng nhập bằng Google (không có password), bỏ qua check mật khẩu cũ
+        if (user.getPassword() != null && !user.getPassword().isEmpty()) {
+            if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
+                throw new IllegalArgumentException("Mật khẩu cũ không đúng");
+            }
+        }
+
+        // Kiểm tra mật khẩu mới và xác nhận mật khẩu có khớp không
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new IllegalArgumentException("Mật khẩu mới và xác nhận mật khẩu không khớp");
+        }
+
+        // Kiểm tra mật khẩu mới có khác mật khẩu cũ không
+        if (user.getPassword() != null && !user.getPassword().isEmpty()) {
+            if (passwordEncoder.matches(request.getNewPassword(), user.getPassword())) {
+                throw new IllegalArgumentException("Mật khẩu mới phải khác mật khẩu cũ");
+            }
+        }
+
+        // Mã hóa mật khẩu mới và lưu vào database
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
     }
 }
 

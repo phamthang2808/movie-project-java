@@ -3,6 +3,7 @@ package com.example.thangcachep.movie_project_be.controllers;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.example.thangcachep.movie_project_be.services.impl.BucketService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -18,11 +19,12 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.example.thangcachep.movie_project_be.entities.UserEntity;
+import com.example.thangcachep.movie_project_be.models.request.ChangePasswordRequest;
 import com.example.thangcachep.movie_project_be.models.responses.UserResponse;
 import com.example.thangcachep.movie_project_be.repositories.UserRepository;
-import com.example.thangcachep.movie_project_be.services.impl.BucketService;
 import com.example.thangcachep.movie_project_be.services.impl.UserService;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -98,6 +100,38 @@ public class UserController {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("success", false, "message", "Upload avatar thất bại: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Đổi mật khẩu
+     * PUT /api/v1/users/change-password
+     * Yêu cầu authentication
+     */
+    @PutMapping("/change-password")
+    public ResponseEntity<Map<String, Object>> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
+        try {
+            UserEntity user = getCurrentUser();
+
+            userService.changePassword(user, request);
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Đổi mật khẩu thành công"
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of(
+                            "success", false,
+                            "message", e.getMessage()
+                    ));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of(
+                            "success", false,
+                            "message", "Đổi mật khẩu thất bại: " + e.getMessage()
+                    ));
         }
     }
 
