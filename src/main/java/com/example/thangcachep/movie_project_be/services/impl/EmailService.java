@@ -77,5 +77,32 @@ public class EmailService {
             log.error("❌ Lỗi khi gửi email reset password đến: {}", toEmail, e);
         }
     }
+
+    /**
+     * Gửi email OTP để đặt lại mật khẩu
+     */
+    public void sendOtpEmail(String toEmail, String otp) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom(fromEmail);
+        message.setTo(toEmail);
+        message.setSubject("Mã OTP đặt lại mật khẩu - Movie Project");
+        message.setText(
+                "Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn.\n\n" +
+                        "Mã OTP của bạn là: " + otp + "\n\n" +
+                        "Mã OTP có hiệu lực trong 10 phút.\n\n" +
+                        "Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.\n\n" +
+                        "Lưu ý: Không chia sẻ mã OTP này với bất kỳ ai.\n\n" +
+                        "Trân trọng,\n" +
+                        "Đội ngũ Movie Project"
+        );
+
+        try {
+            mailSender.send(message);
+            log.info("✅ Đã gửi email OTP đến: {}", toEmail);
+        } catch (Exception e) {
+            log.error("❌ Lỗi khi gửi email OTP đến: {}", toEmail, e);
+            throw new RuntimeException("Không thể gửi email OTP: " + e.getMessage());
+        }
+    }
 }
 

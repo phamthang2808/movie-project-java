@@ -52,18 +52,20 @@ spring:
           model: gemini-2.0-flash
   mail:
     host: smtp.gmail.com
-    port: 587
-    # Tên email của bạn đã được thêm vào
+    port: 465  # Thay vì 587
     username: phamthang28082004@gmail.com
-    # Mật khẩu ứng dụng (16 chữ cái) đã được thêm vào
-    password: oqhjlmqlhwfrfbfz
+    password: dbqnfskpmovuiqww
     properties:
       mail:
         smtp:
           auth: true
-          starttls:
+          ssl:
             enable: true
             required: true
+            trust: "*"
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
   # ==========================================
   # SPRING BEAN OVERRIDING (Cho phép override bean nếu trùng tên)
   # ==========================================

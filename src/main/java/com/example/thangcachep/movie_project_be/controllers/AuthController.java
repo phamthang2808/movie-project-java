@@ -1,18 +1,27 @@
 package com.example.thangcachep.movie_project_be.controllers;
 
 
+import java.util.Map;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.example.thangcachep.movie_project_be.models.request.ForgotPasswordOtpRequest;
 import com.example.thangcachep.movie_project_be.models.request.GoogleAuthRequest;
 import com.example.thangcachep.movie_project_be.models.request.LoginRequest;
 import com.example.thangcachep.movie_project_be.models.request.RegisterRequest;
+import com.example.thangcachep.movie_project_be.models.request.ResetPasswordOtpRequest;
 import com.example.thangcachep.movie_project_be.models.responses.AuthResponse;
 import com.example.thangcachep.movie_project_be.services.impl.AuthService;
+
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -53,6 +62,46 @@ public class AuthController {
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             throw new RuntimeException("Google OAuth thất bại: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Gửi OTP để đặt lại mật khẩu
+     * POST /api/v1/auth/forgot-password-otp
+     */
+    @PostMapping("/forgot-password-otp")
+    public ResponseEntity<Map<String, Object>> sendOtpForPasswordReset(
+            @Valid @RequestBody ForgotPasswordOtpRequest request) {
+        try {
+            Map<String, Object> response = authService.sendOtpForPasswordReset(request.getEmail());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", e.getMessage()
+            ));
+        }
+    }
+
+    /**
+     * Xác nhận OTP và đặt lại mật khẩu
+     * POST /api/v1/auth/reset-password-otp
+     */
+    @PostMapping("/reset-password-otp")
+    public ResponseEntity<Map<String, Object>> verifyOtpAndResetPassword(
+            @Valid @RequestBody ResetPasswordOtpRequest request) {
+        try {
+            Map<String, Object> response = authService.verifyOtpAndResetPassword(
+                    request.getEmail(),
+                    request.getOtp(),
+                    request.getNewPassword()
+            );
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", e.getMessage()
+            ));
         }
     }
 }

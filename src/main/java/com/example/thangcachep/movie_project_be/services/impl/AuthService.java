@@ -29,7 +29,6 @@ import com.example.thangcachep.movie_project_be.models.responses.AuthResponse;
 import com.example.thangcachep.movie_project_be.models.responses.UserResponse;
 import com.example.thangcachep.movie_project_be.repositories.RoleRepository;
 import com.example.thangcachep.movie_project_be.repositories.UserRepository;
-import com.example.thangcachep.movie_project_be.services.impl.UserService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -44,6 +43,7 @@ public class AuthService {
     private final JwtService jwtService;
     private final EmailService emailService;
     private final UserService userService;
+    private final OtpService otpService;
     private final RestTemplate restTemplate = new RestTemplate();
 
     @Value("${google.oauth.client-id:}")
@@ -295,6 +295,79 @@ public class AuthService {
         return userRepository.save(newUser);
     }
 
+
+    /**
+     * Gửi OTP để đặt lại mật khẩu
+     */
+    @Transactional
+    public Map<String, Object> sendOtpForPasswordReset(String email) {
+        // Kiểm tra email có tồn tại không
+        Optional<UserEntity> userOptional = userRepository.findByEmail(email.toLowerCase());
+        if (userOptional.isEmpty()) {
+            // Không tiết lộ email có tồn tại hay không (security best practice)
+            throw new RuntimeException("Nếu email tồn tại, chúng tôi đã gửi mã OTP về email của bạn");
+        }
+
+        UserEntity user = userOptional.get();
+
+        // Kiểm tra user có active không
+        if (!user.getIsActive()) {
+            throw new RuntimeException("Tài khoản của bạn đã bị khóa");
+        }
+
+        // Generate OTP
+        String otp = otpService.generateOtp();
+
+        // Lưu OTP
+        otpService.saveOtp(email.toLowerCase(), otp);
+
+        // Gửi email OTP
+        try {
+            emailService.sendOtpEmail(email, otp);
+        } catch (Exception e) {
+            // Xóa OTP nếu gửi email thất bại
+            otpService.removeOtp(email.toLowerCase());
+            throw new RuntimeException("Không thể gửi email OTP. Vui lòng thử lại sau.");
+        }
+
+        return Map.of(
+                "success", true,
+                "message", "Đã gửi mã OTP về email của bạn"
+        );
+    }
+
+    /**
+     * Xác nhận OTP và đặt lại mật khẩu
+     */
+    @Transactional
+    public Map<String, Object> verifyOtpAndResetPassword(String email, String otp, String newPassword) {
+        // Kiểm tra email có tồn tại không
+        Optional<UserEntity> userOptional = userRepository.findByEmail(email.toLowerCase());
+        if (userOptional.isEmpty()) {
+            throw new RuntimeException("Email không tồn tại");
+        }
+
+        UserEntity user = userOptional.get();
+
+        // Kiểm tra user có active không
+        if (!user.getIsActive()) {
+            throw new RuntimeException("Tài khoản của bạn đã bị khóa");
+        }
+
+        // Verify OTP
+        if (!otpService.verifyOtp(email.toLowerCase(), otp)) {
+            throw new RuntimeException("Mã OTP không đúng hoặc đã hết hạn. Vui lòng thử lại.");
+        }
+
+        // Đặt lại mật khẩu
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+
+        return Map.of(
+                "success", true,
+                "message", "Đặt lại mật khẩu thành công"
+        );
+    }
 
     private UserResponse mapToUserResponse(UserEntity user) {
         // Tự động check VIP expiration trước khi trả về response
