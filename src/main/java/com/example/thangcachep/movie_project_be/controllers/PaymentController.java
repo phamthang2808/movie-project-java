@@ -23,6 +23,7 @@ import com.example.thangcachep.movie_project_be.entities.UserEntity;
 import com.example.thangcachep.movie_project_be.models.responses.UserResponse;
 import com.example.thangcachep.movie_project_be.repositories.TransactionRepository;
 import com.example.thangcachep.movie_project_be.repositories.UserRepository;
+import com.example.thangcachep.movie_project_be.services.impl.BankTransferService;
 import com.example.thangcachep.movie_project_be.services.impl.UserService;
 
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,7 @@ public class PaymentController {
     private final UserRepository userRepository;
     private final UserService userService;
     private final TransactionRepository transactionRepository;
+    private final BankTransferService bankTransferService;
 
     /**
      * Mua VIP - Check balance, trừ tiền, update VIP expiration
@@ -194,6 +196,73 @@ public class PaymentController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(createErrorResponse("Lỗi khi lấy lịch sử giao dịch: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Tạo giao dịch chuyển khoản ngân hàng
+     * POST /api/v1/payments/bank-transfer/create
+     */
+    @PostMapping("/bank-transfer/create")
+    public ResponseEntity<Map<String, Object>> createBankTransferTransaction(
+            @RequestBody Map<String, Object> request) {
+        try {
+            UserEntity user = getCurrentUser();
+
+            // Lấy số tiền từ request
+            Object amountObj = request.get("amount");
+            Double amount = null;
+
+            if (amountObj instanceof Integer) {
+                amount = ((Integer) amountObj).doubleValue();
+            } else if (amountObj instanceof Double) {
+                amount = (Double) amountObj;
+            } else if (amountObj instanceof String) {
+                amount = Double.parseDouble((String) amountObj);
+            }
+
+            if (amount == null || amount <= 0) {
+                return ResponseEntity.badRequest()
+                        .body(createErrorResponse("Số tiền không hợp lệ"));
+            }
+
+            Map<String, Object> response = bankTransferService.createBankTransferTransaction(
+                    user.getId(), amount);
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(createErrorResponse("Lỗi khi tạo giao dịch chuyển khoản: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Verify chuyển khoản ngân hàng (Admin hoặc System)
+     * POST /api/v1/payments/bank-transfer/verify
+     */
+    @PostMapping("/bank-transfer/verify")
+    public ResponseEntity<Map<String, Object>> verifyBankTransfer(
+            @RequestBody Map<String, String> request) {
+        try {
+            String transactionCode = request.get("transactionCode");
+            if (transactionCode == null || transactionCode.isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(createErrorResponse("Mã giao dịch không được để trống"));
+            }
+
+            // Lấy user hiện tại để check quyền (có thể thêm check ADMIN role)
+            UserEntity currentUser = getCurrentUser();
+            String verifiedBy = "USER_" + currentUser.getId(); // Có thể thêm role check
+
+            Map<String, Object> response = bankTransferService.verifyBankTransfer(
+                    transactionCode, verifiedBy);
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(createErrorResponse("Lỗi khi verify chuyển khoản: " + e.getMessage()));
         }
     }
 

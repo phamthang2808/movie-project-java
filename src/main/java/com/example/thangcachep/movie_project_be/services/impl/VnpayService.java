@@ -24,6 +24,7 @@ import com.example.thangcachep.movie_project_be.config.VnPayConfig;
 import com.example.thangcachep.movie_project_be.entities.TransactionEntity;
 import com.example.thangcachep.movie_project_be.entities.UserEntity;
 import com.example.thangcachep.movie_project_be.models.request.VnpayRequest;
+import com.example.thangcachep.movie_project_be.models.responses.VnpayPaymentResponse;
 import com.example.thangcachep.movie_project_be.repositories.TransactionRepository;
 import com.example.thangcachep.movie_project_be.repositories.UserRepository;
 
@@ -38,6 +39,7 @@ public class VnpayService {
 
     private final UserRepository userRepository;
     private final TransactionRepository transactionRepository;
+    private final QrCodeService qrCodeService;
 
 
     public String createPayment(VnpayRequest paymentRequest, Long userId) throws UnsupportedEncodingException {
@@ -127,6 +129,58 @@ public class VnpayService {
         log.debug("🔗 Payment URL: {}", paymentUrl);
 
         return paymentUrl;
+    }
+
+    /**
+     * Tạo payment URL và QR code cho VNPay
+     *
+     * @param paymentRequest Thông tin thanh toán
+     * @param userId ID của user
+     * @return VnpayPaymentResponse chứa payment URL và QR code
+     * @throws UnsupportedEncodingException
+     */
+    public VnpayPaymentResponse createPaymentWithQR(VnpayRequest paymentRequest, Long userId)
+            throws UnsupportedEncodingException {
+        log.info("📝 Bắt đầu tạo VNPay payment với QR code - Số tiền: {} VND, UserId: {}",
+                paymentRequest.getAmount(), userId);
+
+        // Tạo payment URL như bình thường
+        String paymentUrl = createPayment(paymentRequest, userId);
+
+        // Extract transaction reference từ URL
+        String vnp_TxnRef = null;
+        try {
+            String[] urlParts = paymentUrl.split("vnp_TxnRef=");
+            if (urlParts.length > 1) {
+                String[] refParts = urlParts[1].split("&");
+                vnp_TxnRef = refParts[0];
+            }
+        } catch (Exception e) {
+            log.warn("Không thể extract transaction ref từ URL: {}", e.getMessage());
+        }
+
+        // Generate QR code từ payment URL
+        String qrCodeBase64 = qrCodeService.generateQRCodeBase64(paymentUrl, 300, 300);
+        String qrCodeDataUrl = qrCodeService.generateQRCodeDataUrl(paymentUrl, 300, 300);
+
+        // Parse amount
+        long amount = Long.parseLong(paymentRequest.getAmount());
+
+        // Calculate expire time (15 minutes from now)
+        Calendar cld = Calendar.getInstance(TimeZone.getTimeZone("Etc/GMT+7"));
+        cld.add(Calendar.MINUTE, 15);
+        long expireTime = cld.getTimeInMillis();
+
+        log.info("✅ Đã tạo VNPay payment với QR code - TxnRef: {}", vnp_TxnRef);
+
+        return VnpayPaymentResponse.builder()
+                .paymentUrl(paymentUrl)
+                .qrCodeBase64(qrCodeBase64)
+                .qrCodeDataUrl(qrCodeDataUrl)
+                .transactionRef(vnp_TxnRef)
+                .amount(amount)
+                .expireTime(expireTime)
+                .build();
     }
 
     @Transactional
