@@ -34,6 +34,10 @@ build/
 .vscode/
 
 
-# YAML files
+### Environment and Config Files ###
+.env
+.env.local
+.env.production
 *.yml
 *.yaml
+!application.yml.example
