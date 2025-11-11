@@ -149,6 +149,102 @@ public class MovieService {
     }
 
     /**
+     * Lấy danh sách phim đề xuất dựa trên phim hiện tại
+     * Logic: Lấy phim cùng thể loại, cùng type, có rating cao, loại trừ phim hiện tại
+     */
+    public List<MovieResponse> getRecommendedMovies(Long movieId) {
+        // Lấy phim hiện tại
+        MovieEntity currentMovie = movieRepository.findByIdWithCategories(movieId)
+                .orElseThrow(() -> new DataNotFoundException("Không tìm thấy phim với ID: " + movieId));
+
+        // Lấy các category IDs của phim hiện tại
+        Set<Long> categoryIds = currentMovie.getCategories().stream()
+                .map(CategoryEntity::getId)
+                .collect(Collectors.toSet());
+
+        // Nếu không có category, trả về phim trending hoặc top rated
+        if (categoryIds.isEmpty()) {
+            List<MovieEntity> topMovies = movieRepository.findTopRatedMovies(PageRequest.of(0, 10));
+            return topMovies.stream()
+                    .filter(m -> !m.getId().equals(movieId))
+                    .limit(5)
+                    .map(this::mapToMovieResponse)
+                    .collect(Collectors.toList());
+        }
+
+        // Tìm phim cùng category, cùng type, loại trừ phim hiện tại
+        List<MovieEntity> recommendedMovies = new java.util.ArrayList<>();
+
+        // Lấy tất cả phim active và approved
+        List<MovieEntity> allActiveMovies = movieRepository.findByIsActiveTrueWithCategories();
+
+        for (MovieEntity movie : allActiveMovies) {
+            // Loại trừ phim hiện tại
+            if (movie.getId().equals(movieId)) {
+                continue;
+            }
+
+            // Loại trừ phim PENDING/REJECTED
+            if (movie.getStatus() == MovieEntity.MovieStatus.PENDING ||
+                    movie.getStatus() == MovieEntity.MovieStatus.REJECTED) {
+                continue;
+            }
+
+            // Kiểm tra có cùng category không
+            boolean hasCommonCategory = movie.getCategories().stream()
+                    .anyMatch(cat -> categoryIds.contains(cat.getId()));
+
+            // Kiểm tra cùng type (nếu có)
+            boolean sameType = currentMovie.getType() == null ||
+                    movie.getType() == null ||
+                    movie.getType().equals(currentMovie.getType());
+
+            // Nếu có cùng category hoặc cùng type, thêm vào danh sách
+            if (hasCommonCategory || sameType) {
+                recommendedMovies.add(movie);
+            }
+        }
+
+        // Sắp xếp theo rating và viewCount, sau đó giới hạn số lượng
+        List<MovieEntity> sortedMovies = recommendedMovies.stream()
+                .sorted((m1, m2) -> {
+                    // Ưu tiên rating trước
+                    int ratingCompare = Double.compare(
+                            m2.getRating() != null ? m2.getRating() : 0.0,
+                            m1.getRating() != null ? m1.getRating() : 0.0
+                    );
+                    if (ratingCompare != 0) {
+                        return ratingCompare;
+                    }
+                    // Sau đó ưu tiên viewCount
+                    return Long.compare(
+                            m2.getViewCount() != null ? m2.getViewCount() : 0L,
+                            m1.getViewCount() != null ? m1.getViewCount() : 0L
+                    );
+                })
+                .limit(10) // Giới hạn 10 phim
+                .collect(Collectors.toList());
+
+        // Nếu không đủ phim, bổ sung thêm phim top rated
+        if (sortedMovies.size() < 5) {
+            List<MovieEntity> topRated = movieRepository.findTopRatedMovies(PageRequest.of(0, 10));
+            for (MovieEntity movie : topRated) {
+                if (sortedMovies.size() >= 10) {
+                    break;
+                }
+                if (!movie.getId().equals(movieId) &&
+                        !sortedMovies.stream().anyMatch(m -> m.getId().equals(movie.getId()))) {
+                    sortedMovies.add(movie);
+                }
+            }
+        }
+
+        return sortedMovies.stream()
+                .map(this::mapToMovieResponse)
+                .collect(Collectors.toList());
+    }
+
+    /**
      * Tạo phim mới
      */
     @Transactional

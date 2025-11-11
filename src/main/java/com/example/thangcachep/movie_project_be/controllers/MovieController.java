@@ -122,6 +122,23 @@ public class MovieController {
     }
 
     /**
+     * Lấy danh sách phim đề xuất dựa trên phim hiện tại
+     * GET /api/v1/movies/{movieId}/recommendations
+     */
+    @GetMapping("/{movieId}/recommendations")
+    public ResponseEntity<List<MovieResponse>> getRecommendedMovies(@PathVariable Long movieId) {
+        try {
+            List<MovieResponse> movies = movieService.getRecommendedMovies(movieId);
+            return ResponseEntity.ok(movies);
+        } catch (DataNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    /**
      * Tạo phim mới
      * POST /api/v1/movies
      */
