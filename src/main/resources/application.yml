@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
   error:
     include-message: always
     include-binding-errors: always
@@ -10,20 +10,20 @@ spring:
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:mysql://shuttle.proxy.rlwy.net:33159/railway?useSSL=true}
     driver-class-name: com.mysql.cj.jdbc.Driver
-    username: root
+    username: ${SPRING_DATASOURCE_USERNAME:root}
     password: ${MYSQL_ROOT_PASSWORD:ELmYQuCJJkWotiqVTypaKLFbBvVrbzwm}
   jpa:
-#    show-sql: true
+    #    show-sql: true
     show-sql: false
     hibernate:
       ddl-auto: none
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL8Dialect
-#        format_sql: true
+        #        format_sql: true
         format_sql: false
         highlight_sql: true # (Hibernate 6+) tô màu SQL trong console
-#        use_sql_comments: true # thêm comment cho câu SQL
+        #        use_sql_comments: true # thêm comment cho câu SQL
         use_sql_comments: false
   servlet:
     multipart:
@@ -39,22 +39,22 @@ spring:
       static-locations: classpath:/static/, file:./${app.upload-dir}/
     # KHỐI (BLOCK) MỚI ĐƯỢC THÊM TỪ FILE .properties
     cors:
-      allowed-origins: http://localhost:5173,http://localhost:3000
+      allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}
       allowed-methods: GET,POST,PUT,DELETE,OPTIONS
       allowed-headers: "*"
   ai:
     openai:
-      apikey: AIzaSyAfEiTCu-uLWmo6oliaPOfj6cPKFVQAnMA
+      apikey: ${GEMINI_API_KEY:AIzaSyAfEiTCu-uLWmo6oliaPOfj6cPKFVQAnMA}
       chat:
         base-url: https://generativelanguage.googleapis.com
         completions-path: /v1beta/openai/chat/completions
         options:
           model: gemini-2.0-flash
   mail:
-    host: smtp.gmail.com
-    port: 465  # Thay vì 587
-    username: phamthang28082004@gmail.com
-    password: dbqnfskpmovuiqww
+    host: ${SPRING_MAIL_HOST:smtp.gmail.com}
+    port: ${SPRING_MAIL_PORT:465}
+    username: ${SPRING_MAIL_USERNAME:phamthang28082004@gmail.com}
+    password: ${SPRING_MAIL_PASSWORD:dbqnfskpmovuiqww}
     properties:
       mail:
         smtp:
@@ -76,9 +76,9 @@ api:
   prefix: /api/v1
 
 jwt:
-  expiration: 2592000
-  secretKey: TaqlmGv1iEDMRiFp/pHuID1+T84IABfuA0xXh4GhiUI=
-  refresh-expiration: 2592000 # <-- ĐÃ THÊM
+  expiration: ${JWT_EXPIRATION:2592000}
+  secretKey: ${JWT_SECRET_KEY:TaqlmGv1iEDMRiFp/pHuID1+T84IABfuA0xXh4GhiUI=}
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:2592000}
 
 logging:
   level:
@@ -98,13 +98,13 @@ logging:
 
 app:
   upload-dir: uploads
-  base-url: http://localhost:5173
+  base-url: ${APP_BASE_URL:http://localhost:5173}
   # BANK ACCOUNT CONFIGURATION (Thông tin tài khoản ngân hàng nhận tiền)
   # ==========================================
   bank-account:
     bank-name: BIDV # Tên ngân hàng (BIDV, VCB, TCB, VTB, ACB, TPB, VPB, MSB, HDB, VIB, SHB, OCB, MBB, VCCB, AGB)
     account-number: 5311239481 # Số tài khoản ngân hàng
-    account-name: PHAM VAN THANG # Tên chủ tài khoản (viết IN HOA, không dấu)
+    account-name: THANG CA CHEP # Tên chủ tài khoản (viết IN HOA, không dấu)
 
 #  "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqldump.exe" -u root -p --databases hotel --routines --triggers --events --single-transaction --quick --set-gtid-purged=OFF --add-drop-table > sql\hotel.sql
 #"C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqldump.exe" -u root -p --databases hotel --routines --triggers --events --single-transaction --quick --set-gtid-purged=OFF --add-drop-table > hotel.sql
@@ -113,47 +113,36 @@ app:
 # Mode: sandbox (for testing) or live (for production)
 # Get your credentials from: https://developer.paypal.com/dashboard/
 paypal:
-  mode: sandbox
-  client:  # <-- Phải lồng "client" vào đây
-    # Thụt lề 2 dòng này
-    id: AWuXaji91ZBIHvYz2bUCt2eSVWs_bBPETzVj4huU2KeiDrE32XoDvh1PUQ2FQxuZ9iW2mINxtzyFFs-z
-    secret: EEM3Grc7VupTqDHhdJLuxrkNlvwapTSHfBF5Nw-j6OE9X3ERjPgTYvajwliwKfCypmQ4teXqanu3VktH
+  mode: ${PAYPAL_MODE:sandbox}
+  client:
+    id: ${PAYPAL_CLIENT_ID:AWuXaji91ZBIHvYz2bUCt2eSVWs_bBPETzVj4huU2KeiDrE32XoDvh1PUQ2FQxuZ9iW2mINxtzyFFs-z}
+    secret: ${PAYPAL_CLIENT_SECRET:EEM3Grc7VupTqDHhdJLuxrkNlvwapTSHfBF5Nw-j6OE9X3ERjPgTYvajwliwKfCypmQ4teXqanu3VktH}
 
 # VNPay Configuration
 # Get your credentials from: https://sandbox.vnpayment.vn/merchantv2/
 vnpay:
-  tmn-code: JGV9MSIF
-  secret-key: E9QLQ1W7KCLQKQLE5522R5JNRR7WIV8I
+  tmn-code: ${VNPAY_TMN_CODE:JGV9MSIF}
+  secret-key: ${VNPAY_SECRET_KEY:E9QLQ1W7KCLQKQLE5522R5JNRR7WIV8I}
   pay-url: https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
   api-url: https://sandbox.vnpayment.vn/merchant_webapi/api/transaction
-  return-url: http://localhost:5173/vnpay/return
+  return-url: ${VNPAY_RETURN_URL:http://localhost:5173/vnpay/return}
 
 #gemini:
 #  api-key: AIzaSyAfEiTCu-uLWmo6oliaPOfj6cPKFVQAnMA
 #  api-url: https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent
 
-
 # Cấu hình cho Cloudflare R2 Storage
 r2:
-  bucket-name: "thangcachep-video"
-
-  # Ghép Account ID vào đây
-  endpoint: https://f0f2672db9148f22e73449d471512551.r2.cloudflarestorage.com
-
-  # Dán Public URL (bạn lấy ở bước trước)
-  public-url: https://pub-84089b75c7394683b414ceb19004efb8.r2.dev
-
-  # Dán 2 key bạn vừa tạo
-  access-key: 25f4de8a67520cbdf11d17ac0d8b8b47
-  secret-key: fe614fb2cf286d1ca67e3dbb58233a6970a39c79e475cc30bbb9c3092779c83f
-
-  # Giữ nguyên
-  region: "auto"
+  bucket-name: ${R2_BUCKET_NAME:thangcachep-video}
+  endpoint: ${R2_ENDPOINT:https://f0f2672db9148f22e73449d471512551.r2.cloudflarestorage.com}
+  public-url: ${R2_PUBLIC_URL:https://pub-84089b75c7394683b414ceb19004efb8.r2.dev}
+  access-key: ${R2_ACCESS_KEY:25f4de8a67520cbdf11d17ac0d8b8b47}
+  secret-key: ${R2_SECRET_KEY:fe614fb2cf286d1ca67e3dbb58233a6970a39c79e475cc30bbb9c3092779c83f}
+  region: ${R2_REGION:auto}
 #account id            f0f2672db9148f22e73449d471512551
 #ten mien              https://pub-84089b75c7394683b414ceb19004efb8.r2.dev
 #Access Key ID        25f4de8a67520cbdf11d17ac0d8b8b47
 #Secret Access Key    fe614fb2cf286d1ca67e3dbb58233a6970a39c79e475cc30bbb9c3092779c83f
-
 
 # Google OAuth Configuration
 # Lấy Client ID và Client Secret từ: https://console.cloud.google.com/apis/credentials
@@ -163,20 +152,10 @@ google:
     client-secret: ${GOOGLE_CLIENT_SECRET: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}
     redirect-uri: ${GOOGLE_REDIRECT_URI:http://localhost:5173/auth/google/callback}
 
-
-
 aws:
   s3:
-    # AWS S3 Access Key
-    access-key: AKIAQDKYV3PZTWGVQLGI
-    # AWS S3 Secret Key
-    secret-key: 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
-    # AWS S3 Region (ví dụ: us-east-1, ap-southeast-1)
-    region: ap-southeast-2
-    # AWS S3 Bucket Name
-    bucket-name: movie-bucket-java
-    # AWS S3 Public URL
-    # Nếu dùng S3 trực tiếp:
-    public-url: https://movie-bucket-java.s3.ap-southeast-2.amazonaws.com
-    # Hoặc nếu dùng CloudFront CDN (uncomment và sửa):
-    # public-url: https://your-cloudfront-domain.cloudfront.net
+    access-key: ${AWS_S3_ACCESS_KEY:AKIAQDKYV3PZTWGVQLGI}
+    secret-key: ${AWS_S3_SECRET_KEY:2RuFnYg5Jly7kBPck78AIZcHxD5N6nHOfqCAhPLj}
+    region: ${AWS_S3_REGION:ap-southeast-2}
+    bucket-name: ${AWS_S3_BUCKET_NAME:movie-bucket-java}
+    public-url: ${AWS_S3_PUBLIC_URL:https://movie-bucket-java.s3.ap-southeast-2.amazonaws.com}
