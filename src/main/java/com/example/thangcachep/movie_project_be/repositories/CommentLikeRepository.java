@@ -1,5 +1,6 @@
 package com.example.thangcachep.movie_project_be.repositories;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -24,5 +25,15 @@ public interface CommentLikeRepository extends JpaRepository<CommentLikeEntity, 
      * Đếm số lượng like của một comment
      */
     long countByCommentId(Long commentId);
+
+    /**
+     * Lấy tất cả likes của một comment
+     */
+    List<CommentLikeEntity> findByCommentId(Long commentId);
+
+    /**
+     * Xóa tất cả likes của một comment
+     */
+    void deleteByCommentId(Long commentId);
 }
 

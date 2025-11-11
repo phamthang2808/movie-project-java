@@ -1,14 +1,19 @@
 package com.example.thangcachep.movie_project_be.services.impl;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.example.thangcachep.movie_project_be.entities.RoleEntity;
 import com.example.thangcachep.movie_project_be.entities.UserEntity;
+import com.example.thangcachep.movie_project_be.exceptions.DataNotFoundException;
 import com.example.thangcachep.movie_project_be.models.request.ChangePasswordRequest;
 import com.example.thangcachep.movie_project_be.models.responses.UserResponse;
+import com.example.thangcachep.movie_project_be.repositories.RoleRepository;
 import com.example.thangcachep.movie_project_be.repositories.UserRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -18,6 +23,7 @@ import lombok.RequiredArgsConstructor;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
 
     /**
@@ -143,6 +149,171 @@ public class UserService {
         // Mã hóa mật khẩu mới và lưu vào database
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
+    }
+
+    /**
+     * Lấy danh sách tất cả users (admin only)
+     * @param search Từ khóa tìm kiếm (name hoặc email)
+     * @param roleName Lọc theo role (ADMIN, STAFF, USER)
+     * @return Danh sách UserResponse
+     */
+    public List<UserResponse> getAllUsers(String search, String roleName) {
+        List<UserEntity> users;
+
+        // Normalize search và roleName
+        String normalizedSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
+        String normalizedRole = (roleName != null && !roleName.trim().isEmpty()) ? roleName.trim() : null;
+
+        if (normalizedSearch != null && normalizedRole != null) {
+            // Search và filter theo role
+            users = userRepository.searchUsersByRole(normalizedSearch, normalizedRole);
+        } else if (normalizedSearch != null) {
+            // Chỉ search
+            users = userRepository.searchUsers(normalizedSearch);
+        } else if (normalizedRole != null) {
+            // Chỉ filter theo role
+            users = userRepository.findByRoleNameIgnoreCase(normalizedRole);
+        } else {
+            // Lấy tất cả
+            users = userRepository.findAll();
+        }
+
+        return users.stream()
+                .map(this::mapToUserResponse)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Lấy user by ID
+     * @param userId ID của user
+     * @return UserResponse
+     * @throws DataNotFoundException nếu không tìm thấy user
+     */
+    public UserResponse getUserById(Long userId) throws DataNotFoundException {
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new DataNotFoundException("Không tìm thấy user với ID: " + userId));
+        return mapToUserResponse(user);
+    }
+
+    /**
+     * Admin update user (có thể update role, balance, isActive, etc.)
+     * @param userId ID của user cần update
+     * @param request UserResponse chứa thông tin cần update
+     * @param currentUser User hiện tại đang thực hiện action (để check quyền)
+     * @return UserResponse đã được update
+     * @throws DataNotFoundException nếu không tìm thấy user
+     * @throws RuntimeException nếu không có quyền (ví dụ: xóa admin, xóa chính mình)
+     */
+    @Transactional
+    public UserResponse updateUser(Long userId, UserResponse request, UserEntity currentUser) throws DataNotFoundException {
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new DataNotFoundException("Không tìm thấy user với ID: " + userId));
+
+        // Không cho phép update admin (trừ khi là chính admin đó update profile của mình)
+        if (user.getRole().getName().equalsIgnoreCase("ADMIN") && !user.getId().equals(currentUser.getId())) {
+            throw new RuntimeException("Không thể cập nhật thông tin của admin khác");
+        }
+
+        // Update name
+        if (request.getName() != null) {
+            user.setName(request.getName());
+        }
+
+        // Update phone
+        if (request.getPhone() != null) {
+            user.setPhone(request.getPhone());
+        } else if (request.getPhone() == null) {
+            user.setPhone(null);
+        }
+
+        // Update birthday
+        user.setBirthday(request.getBirthday());
+
+        // Update balance (admin only)
+        if (request.getBalance() != null) {
+            user.setBalance(request.getBalance());
+        }
+
+        // Update isActive (admin only)
+        if (request.getIsActive() != null) {
+            // Không cho phép ban admin
+            if (user.getRole().getName().equalsIgnoreCase("ADMIN") && !request.getIsActive()) {
+                throw new RuntimeException("Không thể khóa tài khoản admin");
+            }
+            user.setIsActive(request.getIsActive());
+        }
+
+        // Update role (admin only) - chỉ cho phép update USER và STAFF
+        if (request.getRole() != null && !request.getRole().trim().isEmpty()) {
+            // Không cho phép thay đổi role của admin
+            if (user.getRole().getName().equalsIgnoreCase("ADMIN")) {
+                throw new RuntimeException("Không thể thay đổi role của admin");
+            }
+            // Update role
+            String newRoleName = request.getRole().trim().toUpperCase();
+            RoleEntity newRole = roleRepository.findByName(newRoleName)
+                    .orElseThrow(() -> new RuntimeException("Role không hợp lệ: " + newRoleName));
+            user.setRole(newRole);
+        }
+
+        userRepository.save(user);
+        return mapToUserResponse(user);
+    }
+
+    /**
+     * Ban/Unban user
+     * @param userId ID của user
+     * @param currentUser User hiện tại đang thực hiện action
+     * @return UserResponse đã được update
+     * @throws DataNotFoundException nếu không tìm thấy user
+     * @throws RuntimeException nếu không có quyền
+     */
+    @Transactional
+    public UserResponse banUser(Long userId, UserEntity currentUser) throws DataNotFoundException {
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new DataNotFoundException("Không tìm thấy user với ID: " + userId));
+
+        // Không cho phép ban admin
+        if (user.getRole().getName().equalsIgnoreCase("ADMIN")) {
+            throw new RuntimeException("Không thể khóa tài khoản admin");
+        }
+
+        // Không cho phép ban chính mình
+        if (user.getId().equals(currentUser.getId())) {
+            throw new RuntimeException("Không thể khóa chính mình");
+        }
+
+        // Toggle isActive
+        user.setIsActive(!user.getIsActive());
+        userRepository.save(user);
+
+        return mapToUserResponse(user);
+    }
+
+    /**
+     * Delete user (hard delete)
+     * @param userId ID của user
+     * @param currentUser User hiện tại đang thực hiện action
+     * @throws DataNotFoundException nếu không tìm thấy user
+     * @throws RuntimeException nếu không có quyền
+     */
+    @Transactional
+    public void deleteUser(Long userId, UserEntity currentUser) throws DataNotFoundException {
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new DataNotFoundException("Không tìm thấy user với ID: " + userId));
+
+        // Không cho phép xóa admin
+        if (user.getRole().getName().equalsIgnoreCase("ADMIN")) {
+            throw new RuntimeException("Không thể xóa tài khoản admin");
+        }
+
+        // Không cho phép xóa chính mình
+        if (user.getId().equals(currentUser.getId())) {
+            throw new RuntimeException("Không thể xóa chính mình");
+        }
+
+        // Hard delete
+        userRepository.delete(user);
     }
 }
 

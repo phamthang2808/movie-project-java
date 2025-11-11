@@ -104,7 +104,7 @@ app:
   bank-account:
     bank-name: BIDV # Tên ngân hàng (BIDV, VCB, TCB, VTB, ACB, TPB, VPB, MSB, HDB, VIB, SHB, OCB, MBB, VCCB, AGB)
     account-number: 5311239481 # Số tài khoản ngân hàng
-    account-name: THANG CA CHEP # Tên chủ tài khoản (viết IN HOA, không dấu)
+    account-name: PHAM VAN THANG # Tên chủ tài khoản (viết IN HOA, không dấu)
 
 #  "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqldump.exe" -u root -p --databases hotel --routines --triggers --events --single-transaction --quick --set-gtid-purged=OFF --add-drop-table > sql\hotel.sql
 #"C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqldump.exe" -u root -p --databases hotel --routines --triggers --events --single-transaction --quick --set-gtid-purged=OFF --add-drop-table > hotel.sql

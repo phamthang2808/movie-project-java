@@ -8,10 +8,15 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
 
 import com.example.thangcachep.movie_project_be.entities.CategoryEntity;
 import com.example.thangcachep.movie_project_be.entities.FavoriteEntity;
@@ -48,23 +53,39 @@ public class MovieService {
         Page<MovieEntity> movies;
 
         if (categoryId != null) {
-            // findByCategoryId đã filter isActive = true
+            // findByCategoryId đã filter isActive = true và không có PENDING/REJECTED
             movies = movieRepository.findByCategoryId(categoryId, pageable);
         } else if (type != null) {
             MovieEntity.MovieType movieType = MovieEntity.MovieType.valueOf(type.toUpperCase());
-            // Nếu includeInactive = true, lấy cả phim inactive
+            // Nếu includeInactive = true, lấy cả phim inactive (nhưng vẫn exclude PENDING/REJECTED)
             if (includeInactive != null && includeInactive) {
-                movies = movieRepository.findByType(movieType, pageable);
+                // Lấy tất cả nhưng filter PENDING/REJECTED ở code
+                Page<MovieEntity> allMovies = movieRepository.findByType(movieType, pageable);
+                // Filter và map
+                List<MovieEntity> filteredMovies = allMovies.getContent().stream()
+                        .filter(m -> m.getStatus() != MovieEntity.MovieStatus.PENDING &&
+                                m.getStatus() != MovieEntity.MovieStatus.REJECTED)
+                        .collect(Collectors.toList());
+                // Tạo Page mới từ filtered list
+                movies = new org.springframework.data.domain.PageImpl<>(filteredMovies, pageable, filteredMovies.size());
             } else {
-                // Mặc định chỉ lấy phim active
+                // Mặc định chỉ lấy phim active và không phải PENDING/REJECTED (phim đã được duyệt)
                 movies = movieRepository.findByTypeAndIsActiveTrue(movieType, pageable);
             }
         } else {
-            // Nếu includeInactive = true, lấy tất cả (kể cả inactive)
+            // Nếu includeInactive = true, lấy tất cả (kể cả inactive nhưng exclude PENDING/REJECTED)
             if (includeInactive != null && includeInactive) {
-                movies = movieRepository.findAll(pageable);
+                Page<MovieEntity> allMovies = movieRepository.findAll(pageable);
+                // Filter và map
+                List<MovieEntity> filteredMovies = allMovies.getContent().stream()
+                        .filter(m -> m.getStatus() != MovieEntity.MovieStatus.PENDING &&
+                                m.getStatus() != MovieEntity.MovieStatus.REJECTED)
+                        .collect(Collectors.toList());
+                // Tạo Page mới từ filtered list
+                movies = new org.springframework.data.domain.PageImpl<>(filteredMovies, pageable, filteredMovies.size());
             } else {
-                movies = movieRepository.findByIsActive(true, pageable);
+                // Chỉ lấy phim active và không phải PENDING/REJECTED
+                movies = movieRepository.findByIsActiveTrueAndApproved(pageable);
             }
         }
 
@@ -308,19 +329,21 @@ public class MovieService {
     }
 
     /**
-     * Xóa phim (soft delete - set isActive = false)
+     * Xóa phim khỏi database (hard delete)
+     * Khác với rejectMovie (soft delete - chỉ set isActive = false)
+     * Hành động này không thể hoàn tác - phim sẽ bị xóa vĩnh viễn
      */
     @Transactional
     public void deleteMovie(Long id) throws DataNotFoundException {
         MovieEntity movie = movieRepository.findById(id)
                 .orElseThrow(() -> new DataNotFoundException("Không tìm thấy phim với ID: " + id));
 
-        movie.setIsActive(false);
-        movieRepository.save(movie);
+        // Hard delete: Xóa phim khỏi database hoàn toàn
+        movieRepository.delete(movie);
     }
 
     private MovieResponse mapToMovieResponse(MovieEntity movie) {
-        return MovieResponse.builder()
+        MovieResponse.MovieResponseBuilder builder = MovieResponse.builder()
                 .id(movie.getId())
                 .title(movie.getTitle())
                 .description(movie.getDescription())
@@ -342,8 +365,30 @@ public class MovieService {
                         .map(c -> c.getName())
                         .collect(Collectors.toList()))
                 .createdAt(movie.getCreatedAt())
-                .updatedAt(movie.getUpdatedAt())
-                .build();
+                .updatedAt(movie.getUpdatedAt());
+
+        // Map createdBy info
+        if (movie.getCreatedBy() != null) {
+            builder.createdById(movie.getCreatedBy().getId())
+                    .createdByName(movie.getCreatedBy().getName() != null
+                            ? movie.getCreatedBy().getName()
+                            : movie.getCreatedBy().getEmail());
+        }
+
+        // Map approvedBy info
+        if (movie.getApprovedBy() != null) {
+            builder.approvedById(movie.getApprovedBy().getId())
+                    .approvedByName(movie.getApprovedBy().getName() != null
+                            ? movie.getApprovedBy().getName()
+                            : movie.getApprovedBy().getEmail());
+        }
+
+        // Map approvedAt
+        if (movie.getApprovedAt() != null) {
+            builder.approvedAt(movie.getApprovedAt());
+        }
+
+        return builder.build();
     }
 
     // ==========================================
@@ -617,6 +662,388 @@ public class MovieService {
             return watchHistoryRepository.findByMovieIdAndUserId(movieId, userId)
                     .orElse(null);
         }
+    }
+
+    // ==========================================
+    // STAFF & ADMIN PERMISSION METHODS
+    // ==========================================
+
+    /**
+     * Lấy user hiện tại từ SecurityContext
+     */
+    private UserEntity getCurrentUser() {
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null || authentication.getPrincipal() == null) {
+                return null;
+            }
+
+            Object principal = authentication.getPrincipal();
+            if (principal instanceof UserEntity) {
+                return (UserEntity) principal;
+            }
+
+            if (principal instanceof String && principal.equals("anonymousUser")) {
+                return null;
+            }
+
+            return null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * Tạo phim mới cho Staff (status: PENDING)
+     */
+    @Transactional
+    public MovieResponse createMovieForStaff(MovieRequest request) {
+        UserEntity currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new RuntimeException("User chưa đăng nhập");
+        }
+
+        MovieEntity movie = new MovieEntity();
+        setMovieBasicFields(movie, request);
+
+        // Staff tạo phim → status PENDING
+        movie.setStatus(MovieEntity.MovieStatus.PENDING);
+        movie.setCreatedBy(currentUser);
+        movie.setIsActive(true);
+
+        movie = movieRepository.save(movie);
+        return mapToMovieResponse(movie);
+    }
+
+    /**
+     * Tạo phim mới cho Admin (status: ACTIVE/AIRING tùy chọn)
+     */
+    @Transactional
+    public MovieResponse createMovieForAdmin(MovieRequest request) {
+        UserEntity currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new RuntimeException("User chưa đăng nhập");
+        }
+
+        MovieEntity movie = new MovieEntity();
+        setMovieBasicFields(movie, request);
+
+        // Admin tạo phim → status ACTIVE/AIRING ngay (không cần duyệt)
+        // Nếu không có status trong request, mặc định là AIRING
+        if (request.getStatus() == null || request.getStatus().isEmpty()) {
+            movie.setStatus(MovieEntity.MovieStatus.AIRING);
+        } else {
+            try {
+                MovieEntity.MovieStatus status = MovieEntity.MovieStatus.valueOf(request.getStatus().toUpperCase());
+                // Admin không thể tạo phim với status PENDING
+                if (status == MovieEntity.MovieStatus.PENDING) {
+                    movie.setStatus(MovieEntity.MovieStatus.AIRING);
+                } else {
+                    movie.setStatus(status);
+                }
+            } catch (IllegalArgumentException e) {
+                movie.setStatus(MovieEntity.MovieStatus.AIRING);
+            }
+        }
+
+        movie.setCreatedBy(currentUser);
+        // Admin tạo phim → tự động approve
+        movie.setApprovedBy(currentUser);
+        movie.setApprovedAt(LocalDateTime.now());
+        movie.setIsActive(true);
+
+        movie = movieRepository.save(movie);
+        return mapToMovieResponse(movie);
+    }
+
+    /**
+     * Helper method để set các field cơ bản của phim
+     */
+    private void setMovieBasicFields(MovieEntity movie, MovieRequest request) {
+        movie.setTitle(request.getTitle());
+        movie.setDescription(request.getDescription());
+        movie.setPosterUrl(request.getPosterUrl() != null && !request.getPosterUrl().trim().isEmpty()
+                ? request.getPosterUrl().trim() : null);
+        movie.setBackdropUrl(request.getBackdropUrl() != null && !request.getBackdropUrl().trim().isEmpty()
+                ? request.getBackdropUrl().trim() : null);
+        movie.setTrailerUrl(request.getTrailerUrl() != null && !request.getTrailerUrl().trim().isEmpty()
+                ? request.getTrailerUrl().trim() : null);
+        movie.setVideoUrl(request.getVideoUrl() != null && !request.getVideoUrl().trim().isEmpty()
+                ? request.getVideoUrl().trim() : null);
+        movie.setDuration(request.getDuration());
+        movie.setReleaseDate(request.getReleaseDate());
+        movie.setPrice(request.getPrice() != null ? request.getPrice() : 0.0);
+        movie.setIsVipOnly(request.getIsVipOnly() != null ? request.getIsVipOnly() : false);
+
+        // Set type
+        if (request.getType() != null) {
+            try {
+                movie.setType(MovieEntity.MovieType.valueOf(request.getType().toUpperCase()));
+            } catch (IllegalArgumentException e) {
+                movie.setType(MovieEntity.MovieType.MOVIE);
+            }
+        } else {
+            movie.setType(MovieEntity.MovieType.MOVIE);
+        }
+
+        // Set categories
+        if (request.getCategoryIds() != null && !request.getCategoryIds().isEmpty()) {
+            Set<CategoryEntity> categories = new HashSet<>();
+            for (Long categoryId : request.getCategoryIds()) {
+                categoryRepository.findById(categoryId).ifPresent(categories::add);
+            }
+            movie.setCategories(categories);
+        }
+
+        // Set default values
+        movie.setRating(0.0);
+        movie.setRatingCount(0);
+        movie.setViewCount(0);
+    }
+
+    /**
+     * Cập nhật phim cho Staff (chỉ cho phép sửa phim PENDING hoặc phim do Staff đó tạo)
+     */
+    @Transactional
+    public MovieResponse updateMovieForStaff(Long id, Map<String, Object> updates) throws DataNotFoundException {
+        UserEntity currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new RuntimeException("User chưa đăng nhập");
+        }
+
+        MovieEntity movie = movieRepository.findByIdWithCategories(id)
+                .orElseThrow(() -> new DataNotFoundException("Không tìm thấy phim với ID: " + id));
+
+        // Staff chỉ có thể sửa phim PENDING hoặc phim do chính mình tạo
+        if (movie.getStatus() != MovieEntity.MovieStatus.PENDING) {
+            // Nếu không phải PENDING, kiểm tra xem có phải phim do Staff đó tạo không
+            if (movie.getCreatedBy() == null || !movie.getCreatedBy().getId().equals(currentUser.getId())) {
+                throw new RuntimeException("Bạn không có quyền sửa phim này. Chỉ có thể sửa phim đang chờ duyệt hoặc phim do bạn tạo.");
+            }
+        }
+
+        // Staff không thể thay đổi status thành ACTIVE/AIRING/COMPLETED
+        if (updates.containsKey("status")) {
+            String statusStr = (String) updates.get("status");
+            try {
+                MovieEntity.MovieStatus newStatus = MovieEntity.MovieStatus.valueOf(statusStr.toUpperCase());
+                // Staff chỉ có thể set status là PENDING hoặc REJECTED (nếu muốn hủy)
+                if (newStatus != MovieEntity.MovieStatus.PENDING && newStatus != MovieEntity.MovieStatus.REJECTED) {
+                    throw new RuntimeException("Staff không thể đặt status thành " + newStatus + ". Vui lòng để Admin duyệt phim.");
+                }
+            } catch (IllegalArgumentException e) {
+                // Ignore invalid status
+            }
+        }
+
+        // Cập nhật các field khác
+        updateMovieFields(movie, updates);
+
+        movie = movieRepository.save(movie);
+        return mapToMovieResponse(movie);
+    }
+
+    /**
+     * Cập nhật phim cho Admin (có thể sửa tất cả phim)
+     */
+    @Transactional
+    public MovieResponse updateMovieForAdmin(Long id, Map<String, Object> updates) throws DataNotFoundException {
+        MovieEntity movie = movieRepository.findByIdWithCategories(id)
+                .orElseThrow(() -> new DataNotFoundException("Không tìm thấy phim với ID: " + id));
+
+        // Admin có thể sửa tất cả phim
+        updateMovieFields(movie, updates);
+
+        movie = movieRepository.save(movie);
+        return mapToMovieResponse(movie);
+    }
+
+    /**
+     * Helper method để cập nhật các field của phim
+     */
+    private void updateMovieFields(MovieEntity movie, Map<String, Object> updates) {
+        if (updates.containsKey("title")) {
+            movie.setTitle((String) updates.get("title"));
+        }
+        if (updates.containsKey("description")) {
+            movie.setDescription((String) updates.get("description"));
+        }
+        if (updates.containsKey("posterUrl")) {
+            String posterUrl = (String) updates.get("posterUrl");
+            movie.setPosterUrl(posterUrl != null && !posterUrl.trim().isEmpty() ? posterUrl.trim() : null);
+        }
+        if (updates.containsKey("backdropUrl")) {
+            String backdropUrl = (String) updates.get("backdropUrl");
+            movie.setBackdropUrl(backdropUrl != null && !backdropUrl.trim().isEmpty() ? backdropUrl.trim() : null);
+        }
+        if (updates.containsKey("trailerUrl")) {
+            movie.setTrailerUrl((String) updates.get("trailerUrl"));
+        }
+        if (updates.containsKey("videoUrl")) {
+            movie.setVideoUrl((String) updates.get("videoUrl"));
+        }
+        if (updates.containsKey("duration")) {
+            Object duration = updates.get("duration");
+            if (duration instanceof Number) {
+                movie.setDuration(((Number) duration).intValue());
+            }
+        }
+        if (updates.containsKey("price")) {
+            Object price = updates.get("price");
+            if (price instanceof Number) {
+                movie.setPrice(((Number) price).doubleValue());
+            }
+        }
+        if (updates.containsKey("isVipOnly")) {
+            movie.setIsVipOnly((Boolean) updates.get("isVipOnly"));
+        }
+        if (updates.containsKey("isActive")) {
+            movie.setIsActive((Boolean) updates.get("isActive"));
+        }
+        if (updates.containsKey("type")) {
+            try {
+                String typeStr = (String) updates.get("type");
+                movie.setType(MovieEntity.MovieType.valueOf(typeStr.toUpperCase()));
+            } catch (IllegalArgumentException e) {
+                // Ignore invalid type
+            }
+        }
+        if (updates.containsKey("status")) {
+            String statusStr = (String) updates.get("status");
+            try {
+                movie.setStatus(MovieEntity.MovieStatus.valueOf(statusStr.toUpperCase()));
+            } catch (IllegalArgumentException e) {
+                // Ignore invalid status
+            }
+        }
+
+        // Cập nhật categories
+        if (updates.containsKey("categoryIds")) {
+            Object categoryIdsObj = updates.get("categoryIds");
+            if (categoryIdsObj instanceof List) {
+                @SuppressWarnings("unchecked")
+                List<Object> categoryIdsList = (List<Object>) categoryIdsObj;
+                Set<CategoryEntity> categories = new HashSet<>();
+
+                for (Object categoryIdObj : categoryIdsList) {
+                    Long categoryId = null;
+                    if (categoryIdObj instanceof Number) {
+                        categoryId = ((Number) categoryIdObj).longValue();
+                    } else if (categoryIdObj instanceof String) {
+                        try {
+                            categoryId = Long.parseLong((String) categoryIdObj);
+                        } catch (NumberFormatException e) {
+                            continue;
+                        }
+                    }
+
+                    if (categoryId != null) {
+                        categoryRepository.findById(categoryId).ifPresent(categories::add);
+                    }
+                }
+
+                movie.setCategories(categories);
+            }
+        }
+    }
+
+    /**
+     * Duyệt phim (chuyển từ PENDING sang ACTIVE/AIRING)
+     */
+    @Transactional
+    public MovieResponse approveMovie(Long id, String targetStatus) throws DataNotFoundException {
+        UserEntity currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new RuntimeException("User chưa đăng nhập");
+        }
+
+        MovieEntity movie = movieRepository.findByIdWithCategories(id)
+                .orElseThrow(() -> new DataNotFoundException("Không tìm thấy phim với ID: " + id));
+
+        // Chỉ có thể duyệt phim PENDING
+        if (movie.getStatus() != MovieEntity.MovieStatus.PENDING) {
+            throw new RuntimeException("Chỉ có thể duyệt phim đang chờ duyệt (PENDING)");
+        }
+
+        // Set status mới (mặc định là AIRING)
+        MovieEntity.MovieStatus newStatus = MovieEntity.MovieStatus.AIRING;
+        if (targetStatus != null && !targetStatus.isEmpty()) {
+            try {
+                newStatus = MovieEntity.MovieStatus.valueOf(targetStatus.toUpperCase());
+                // Chỉ cho phép chuyển sang ACTIVE/AIRING/UPCOMING
+                if (newStatus == MovieEntity.MovieStatus.PENDING || newStatus == MovieEntity.MovieStatus.REJECTED) {
+                    throw new RuntimeException("Không thể duyệt phim với status " + newStatus);
+                }
+            } catch (IllegalArgumentException e) {
+                newStatus = MovieEntity.MovieStatus.AIRING;
+            }
+        }
+
+        movie.setStatus(newStatus);
+        movie.setApprovedBy(currentUser);
+        movie.setApprovedAt(LocalDateTime.now());
+        movie.setIsActive(true);
+
+        movie = movieRepository.save(movie);
+        return mapToMovieResponse(movie);
+    }
+
+    /**
+     * Từ chối phim (chuyển từ PENDING sang REJECTED)
+     */
+    @Transactional
+    public MovieResponse rejectMovie(Long id) throws DataNotFoundException {
+        UserEntity currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new RuntimeException("User chưa đăng nhập");
+        }
+
+        MovieEntity movie = movieRepository.findByIdWithCategories(id)
+                .orElseThrow(() -> new DataNotFoundException("Không tìm thấy phim với ID: " + id));
+
+        // Chỉ có thể từ chối phim PENDING
+        if (movie.getStatus() != MovieEntity.MovieStatus.PENDING) {
+            throw new RuntimeException("Chỉ có thể từ chối phim đang chờ duyệt (PENDING)");
+        }
+
+        movie.setStatus(MovieEntity.MovieStatus.REJECTED);
+        movie.setApprovedBy(currentUser);
+        movie.setApprovedAt(LocalDateTime.now());
+        movie.setIsActive(false); // Rejected phim không hiển thị
+
+        movie = movieRepository.save(movie);
+        return mapToMovieResponse(movie);
+    }
+
+    /**
+     * Lấy danh sách phim chờ duyệt (PENDING)
+     */
+    public List<MovieResponse> getPendingMovies() {
+        List<MovieEntity> movies = movieRepository.findByStatusWithCategories(MovieEntity.MovieStatus.PENDING);
+        return movies.stream()
+                .map(this::mapToMovieResponse)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Lấy danh sách phim do Staff tạo
+     */
+    public List<MovieResponse> getMoviesByStaff(Long staffId) {
+        List<MovieEntity> movies = movieRepository.findByCreatedByIdWithCategories(staffId);
+        return movies.stream()
+                .map(this::mapToMovieResponse)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Lấy danh sách phim do Staff hiện tại tạo
+     */
+    public List<MovieResponse> getMoviesByCurrentStaff() {
+        UserEntity currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new RuntimeException("User chưa đăng nhập");
+        }
+        return getMoviesByStaff(currentUser.getId());
     }
 }
 

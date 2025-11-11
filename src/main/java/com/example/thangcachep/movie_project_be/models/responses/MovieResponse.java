@@ -23,7 +23,7 @@ public class MovieResponse {
     private String trailerUrl;
     private String videoUrl;
     private String type; // MOVIE, SERIES
-    private String status; // UPCOMING, AIRING, COMPLETED
+    private String status; // PENDING, UPCOMING, AIRING, COMPLETED, REJECTED
     private Integer duration;
     private LocalDate releaseDate;
     private Double rating;
@@ -35,6 +35,13 @@ public class MovieResponse {
     private List<String> categories;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    // Fields để track ai tạo và ai duyệt phim
+    private Long createdById; // ID của user tạo phim
+    private String createdByName; // Tên của user tạo phim
+    private Long approvedById; // ID của admin duyệt phim
+    private String approvedByName; // Tên của admin duyệt phim
+    private LocalDateTime approvedAt; // Thời gian duyệt
 }
 
 

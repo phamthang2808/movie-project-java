@@ -337,7 +337,38 @@ public class AuthService {
     }
 
     /**
+     * Verify OTP (chỉ kiểm tra, không reset password)
+     */
+    public Map<String, Object> verifyOtpOnly(String email, String otp) {
+        // Kiểm tra email có tồn tại không
+        Optional<UserEntity> userOptional = userRepository.findByEmail(email.toLowerCase());
+        if (userOptional.isEmpty()) {
+            // Không tiết lộ email có tồn tại hay không (security best practice)
+            throw new RuntimeException("Mã OTP không đúng hoặc đã hết hạn. Vui lòng thử lại.");
+        }
+
+        UserEntity user = userOptional.get();
+
+        // Kiểm tra user có active không
+        if (!user.getIsActive()) {
+            throw new RuntimeException("Tài khoản của bạn đã bị khóa");
+        }
+
+        // Verify OTP (chỉ kiểm tra, không xóa OTP)
+        if (!otpService.verifyOtpOnly(email.toLowerCase(), otp)) {
+            throw new RuntimeException("Mã OTP không đúng hoặc đã hết hạn. Vui lòng thử lại.");
+        }
+
+        return Map.of(
+                "success", true,
+                "message", "Mã OTP đã được xác nhận thành công"
+        );
+    }
+
+    /**
      * Xác nhận OTP và đặt lại mật khẩu
+     * - Nếu OTP đã được verify trước đó (qua /verify-otp), không cần gửi OTP (otp có thể null hoặc empty)
+     * - Nếu OTP chưa được verify, cần gửi OTP để verify và reset cùng lúc
      */
     @Transactional
     public Map<String, Object> verifyOtpAndResetPassword(String email, String otp, String newPassword) {
@@ -354,9 +385,26 @@ public class AuthService {
             throw new RuntimeException("Tài khoản của bạn đã bị khóa");
         }
 
-        // Verify OTP
-        if (!otpService.verifyOtp(email.toLowerCase(), otp)) {
-            throw new RuntimeException("Mã OTP không đúng hoặc đã hết hạn. Vui lòng thử lại.");
+        // Nếu OTP đã được verify trước đó (trong vòng 5 phút), không cần gửi OTP
+        if (otpService.isOtpVerified(email.toLowerCase())) {
+            // OTP đã được verify, cho phép reset password
+            // Xóa OTP và trạng thái verified sau khi reset password thành công
+            otpService.removeOtp(email.toLowerCase());
+        } else {
+            // OTP chưa được verify, cần verify OTP
+            if (otp == null || otp.trim().isEmpty()) {
+                throw new RuntimeException("Mã OTP chưa được xác nhận. Vui lòng xác nhận OTP trước hoặc gửi mã OTP.");
+            }
+
+            // Validate OTP format (phải là 6 số)
+            if (!otp.matches("^[0-9]{6}$")) {
+                throw new RuntimeException("Mã OTP phải là 6 số");
+            }
+
+            // Verify OTP
+            if (!otpService.verifyOtp(email.toLowerCase(), otp)) {
+                throw new RuntimeException("Mã OTP không đúng hoặc đã hết hạn. Vui lòng thử lại.");
+            }
         }
 
         // Đặt lại mật khẩu

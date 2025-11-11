@@ -12,6 +12,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -115,10 +116,24 @@ public class MovieEntity extends BaseEntity {
         MOVIE, SERIES
     }
 
+    // Fields để track ai tạo và ai duyệt phim
+    @ManyToOne
+    @JoinColumn(name = "created_by_user_id")
+    private UserEntity createdBy; // Staff/Admin nào tạo phim này
+
+    @ManyToOne
+    @JoinColumn(name = "approved_by_user_id")
+    private UserEntity approvedBy; // Admin nào duyệt phim này
+
+    @Column
+    private java.time.LocalDateTime approvedAt; // Thời gian duyệt
+
     // Enum cho MovieStatus
     public enum MovieStatus {
-        UPCOMING,    // Sắp chiếu
-        AIRING,      // Đang chiếu
-        COMPLETED    // Hoàn thành
+        PENDING,    // Chờ duyệt (phim do Staff tạo, chưa được Admin duyệt)
+        UPCOMING,   // Sắp chiếu
+        AIRING,     // Đang chiếu
+        COMPLETED,  // Hoàn thành
+        REJECTED    // Đã từ chối (phim bị Admin reject)
     }
 }

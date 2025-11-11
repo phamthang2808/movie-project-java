@@ -24,5 +24,15 @@ public class CommentResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private List<CommentResponse> replies; // Danh sách replies
+
+    // Fields for Admin/Staff management
+    private String status; // PENDING, APPROVED, REJECTED
+    private Long userId; // ID của user tạo comment
+    private String userEmail; // Email của user
+    private Long movieId; // ID của phim
+    private String movieTitle; // Tên phim
+    private Long approvedById; // ID của admin duyệt/từ chối
+    private String approvedByName; // Tên của admin duyệt/từ chối
+    private LocalDateTime approvedAt; // Thời gian duyệt/từ chối
 }
 

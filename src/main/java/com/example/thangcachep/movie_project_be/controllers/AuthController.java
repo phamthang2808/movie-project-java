@@ -17,6 +17,7 @@ import com.example.thangcachep.movie_project_be.models.request.GoogleAuthRequest
 import com.example.thangcachep.movie_project_be.models.request.LoginRequest;
 import com.example.thangcachep.movie_project_be.models.request.RegisterRequest;
 import com.example.thangcachep.movie_project_be.models.request.ResetPasswordOtpRequest;
+import com.example.thangcachep.movie_project_be.models.request.VerifyOtpRequest;
 import com.example.thangcachep.movie_project_be.models.responses.AuthResponse;
 import com.example.thangcachep.movie_project_be.services.impl.AuthService;
 
@@ -84,8 +85,31 @@ public class AuthController {
     }
 
     /**
+     * Verify OTP (chỉ kiểm tra, không reset password)
+     * POST /api/v1/auth/verify-otp
+     */
+    @PostMapping("/verify-otp")
+    public ResponseEntity<Map<String, Object>> verifyOtpOnly(
+            @Valid @RequestBody VerifyOtpRequest request) {
+        try {
+            Map<String, Object> response = authService.verifyOtpOnly(
+                    request.getEmail(),
+                    request.getOtp()
+            );
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", e.getMessage()
+            ));
+        }
+    }
+
+    /**
      * Xác nhận OTP và đặt lại mật khẩu
      * POST /api/v1/auth/reset-password-otp
+     * - Nếu OTP đã được verify trước đó (qua /verify-otp), có thể không gửi OTP (otp = null hoặc empty)
+     * - Nếu OTP chưa được verify, cần gửi OTP để verify và reset cùng lúc
      */
     @PostMapping("/reset-password-otp")
     public ResponseEntity<Map<String, Object>> verifyOtpAndResetPassword(
