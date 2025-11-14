@@ -8,10 +8,22 @@ spring:
   application:
     name: movie-project-be # <-- ĐÃ CẬP NHẬT
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://shuttle.proxy.rlwy.net:33159/railway?useSSL=true}
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://shuttle.proxy.rlwy.net:33159/railway?useSSL=true&autoReconnect=true&failOverReadOnly=false&maxReconnects=10&initialTimeout=2&connectTimeout=30000&socketTimeout=60000}
     driver-class-name: com.mysql.cj.jdbc.Driver
     username: ${SPRING_DATASOURCE_USERNAME:root}
     password: ${MYSQL_ROOT_PASSWORD:ELmYQuCJJkWotiqVTypaKLFbBvVrbzwm}
+    hikari:
+      # Connection pool settings
+      minimum-idle: 5
+      maximum-pool-size: 20
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      # Connection validation
+      connection-test-query: SELECT 1
+      validation-timeout: 5000
+      # Leak detection
+      leak-detection-threshold: 60000
   jpa:
     #    show-sql: true
     show-sql: false

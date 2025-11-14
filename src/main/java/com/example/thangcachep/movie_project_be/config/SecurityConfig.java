@@ -67,6 +67,9 @@ public class SecurityConfig {
                         // POST comments sẽ check authentication trong controller
                         .requestMatchers("/api/v1/movies/**").permitAll()
                         .requestMatchers("/api/v1/categories/**").permitAll()
+                        .requestMatchers("/api/v1/watch-together/rooms").permitAll() // Allow viewing active rooms
+                        .requestMatchers("/api/v1/watch-together/rooms/**").authenticated() // Require auth for room operations
+                        .requestMatchers("/ws/**").permitAll() // WebSocket endpoint - authentication handled in handler
                         .requestMatchers("/api/v1/users/**").authenticated()
                         .requestMatchers("/api/v1/payments/**").authenticated()
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
