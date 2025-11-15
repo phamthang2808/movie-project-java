@@ -46,12 +46,21 @@ public class WatchTogetherRoomEntity {
     private LocalDateTime updatedAt;
 
     @Column(nullable = false)
+    @Builder.Default
     private Boolean isActive = true;
+
+    @Column
+    private LocalDateTime expiresAt; // Thời gian hết hạn (dựa trên movie duration + buffer hoặc thời gian cố định)
+
+    @Column
+    private LocalDateTime lastActivityAt; // Thời gian có activity cuối cùng (join, chat, sync)
 
     @PrePersist
     protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now();
+        createdAt = now;
+        updatedAt = now;
+        lastActivityAt = now;
     }
 
     @PreUpdate

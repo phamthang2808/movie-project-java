@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -41,6 +42,16 @@ public class WatchTogetherService implements IWatchTogetherService {
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new DataNotFoundException("User not found with id: " + userId));
 
+        // Tính expiresAt: dựa trên movie duration + buffer 10 phút, nhưng không quá 4 giờ
+        LocalDateTime now = LocalDateTime.now();
+        int movieDurationMinutes = movie.getDuration() != null ? movie.getDuration() : 120; // Default 2 giờ
+        int bufferMinutes = 10; // Buffer 10 phút sau khi hết phim
+        int maxRoomLifetimeMinutes = 240; // Tối đa 4 giờ
+
+        // expiresAt = min(movie duration + buffer, max lifetime)
+        int totalMinutes = Math.min(movieDurationMinutes + bufferMinutes, maxRoomLifetimeMinutes);
+        LocalDateTime expiresAt = now.plusMinutes(totalMinutes);
+
         // Create room
         WatchTogetherRoomEntity room = WatchTogetherRoomEntity.builder()
                 .id(UUID.randomUUID().toString())
@@ -50,6 +61,7 @@ public class WatchTogetherService implements IWatchTogetherService {
                         : "Room for " + movie.getTitle())
                 .createdBy(user)
                 .isActive(true)
+                .expiresAt(expiresAt)
                 .build();
 
         room = roomRepository.save(room);

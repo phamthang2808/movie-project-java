@@ -24,6 +24,7 @@ import com.example.thangcachep.movie_project_be.exceptions.DataNotFoundException
 import com.example.thangcachep.movie_project_be.models.request.CommentRequest;
 import com.example.thangcachep.movie_project_be.models.request.MovieRequest;
 import com.example.thangcachep.movie_project_be.models.responses.CommentResponse;
+import com.example.thangcachep.movie_project_be.models.responses.EpisodeResponse;
 import com.example.thangcachep.movie_project_be.models.responses.MovieResponse;
 import com.example.thangcachep.movie_project_be.services.impl.CommentService;
 import com.example.thangcachep.movie_project_be.services.impl.MovieService;
@@ -89,6 +90,16 @@ public class MovieController {
     public ResponseEntity<MovieResponse> getMovieById(@PathVariable Long id) {
         MovieResponse movie = movieService.getMovieById(id);
         return ResponseEntity.ok(movie);
+    }
+
+    /**
+     * Lấy danh sách episodes của một phim bộ
+     * GET /api/v1/movies/{movieId}/episodes
+     */
+    @GetMapping("/{movieId}/episodes")
+    public ResponseEntity<List<EpisodeResponse>> getMovieEpisodes(@PathVariable Long movieId) {
+        List<EpisodeResponse> episodes = movieService.getEpisodesByMovieId(movieId);
+        return ResponseEntity.ok(episodes);
     }
 
     @GetMapping("/search")

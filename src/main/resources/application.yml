@@ -8,6 +8,7 @@ spring:
   application:
     name: movie-project-be # <-- ĐÃ CẬP NHẬT
   datasource:
+    # MySQL (data chính - giữ nguyên)
     url: ${SPRING_DATASOURCE_URL:jdbc:mysql://shuttle.proxy.rlwy.net:33159/railway?useSSL=true&autoReconnect=true&failOverReadOnly=false&maxReconnects=10&initialTimeout=2&connectTimeout=30000&socketTimeout=60000}
     driver-class-name: com.mysql.cj.jdbc.Driver
     username: ${SPRING_DATASOURCE_USERNAME:root}
@@ -19,7 +20,7 @@ spring:
       connection-timeout: 30000
       idle-timeout: 600000
       max-lifetime: 1800000
-      # Connection validation
+      # Connection validation (PostgreSQL)
       connection-test-query: SELECT 1
       validation-timeout: 5000
       # Leak detection
@@ -42,6 +43,7 @@ spring:
       enabled: true # <-- ĐÃ THÊM
       max-file-size: 2GB
       max-request-size: 2GB
+      file-size-threshold: 10MB # Buffer size trước khi ghi vào disk
   messages:
     basename: i18n/messages
     encoding: UTF-8
@@ -49,19 +51,45 @@ spring:
   web:
     resources:
       static-locations: classpath:/static/, file:./${app.upload-dir}/
+      # Tối ưu static resources (video, images)
+      cache:
+        period: 31536000 # Cache 1 năm cho static resources
+        cachecontrol:
+          max-age: 31536000
+          cache-public: true
     # KHỐI (BLOCK) MỚI ĐƯỢC THÊM TỪ FILE .properties
     cors:
       allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}
       allowed-methods: GET,POST,PUT,DELETE,OPTIONS
       allowed-headers: "*"
   ai:
+    # OpenAI/Gemini Chat Model (using OpenAI-compatible API)
+    # Note: Gemini can be used via OpenAI client with custom base URL
     openai:
-      apikey: ${GEMINI_API_KEY:AIzaSyAfEiTCu-uLWmo6oliaPOfj6cPKFVQAnMA}
+      api-key: ${OPENAI_API_KEY:AIzaSyAfEiTCu-uLWmo6oliaPOfj6cPKFVQAnMA}
       chat:
-        base-url: https://generativelanguage.googleapis.com
-        completions-path: /v1beta/openai/chat/completions
         options:
-          model: gemini-2.0-flash
+          model: ${OPENAI_MODEL:gemini-2.0-flash-exp}
+        base-url: ${OPENAI_BASE_URL:https://generativelanguage.googleapis.com/v1beta/openai}
+      # Embedding model for vector generation (optional)
+      embedding:
+        api-key: ${OPENAI_EMBEDDING_API_KEY:${OPENAI_API_KEY}}
+        base-url: ${OPENAI_EMBEDDING_BASE_URL:${OPENAI_BASE_URL}}
+        options:
+          model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+    # Ollama (Optional - comment nếu không dùng)
+    # ollama:
+    #   base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+    #   chat:
+    #     options:
+    #       model: ${OLLAMA_MODEL:llama3.2}
+    # Vector Store (Optional - comment nếu không dùng PostgreSQL)
+    # vectorstore:
+    #   enabled: ${VECTORSTORE_ENABLED:false}
+    #   pgvector:
+    #     index-type: HNSW
+    #     distance-type: COSINE_DISTANCE
+    #     dimensions: 1536
   mail:
     host: ${SPRING_MAIL_HOST:smtp.gmail.com}
     port: ${SPRING_MAIL_PORT:465}
@@ -138,10 +166,6 @@ vnpay:
   pay-url: https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
   api-url: https://sandbox.vnpayment.vn/merchant_webapi/api/transaction
   return-url: ${VNPAY_RETURN_URL:http://localhost:5173/vnpay/return}
-
-#gemini:
-#  api-key: AIzaSyAfEiTCu-uLWmo6oliaPOfj6cPKFVQAnMA
-#  api-url: https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent
 
 # Cấu hình cho Cloudflare R2 Storage
 r2:

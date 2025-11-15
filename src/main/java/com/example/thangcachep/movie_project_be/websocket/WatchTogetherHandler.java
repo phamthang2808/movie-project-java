@@ -1,6 +1,7 @@
 package com.example.thangcachep.movie_project_be.websocket;
 
 import com.example.thangcachep.movie_project_be.entities.UserEntity;
+import com.example.thangcachep.movie_project_be.entities.WatchTogetherRoomEntity;
 import com.example.thangcachep.movie_project_be.repositories.UserRepository;
 import com.example.thangcachep.movie_project_be.repositories.WatchTogetherRoomRepository;
 import com.example.thangcachep.movie_project_be.services.IWatchTogetherService;
@@ -17,6 +18,7 @@ import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -49,15 +51,12 @@ public class WatchTogetherHandler extends TextWebSocketHandler {
      */
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
-        log.info("WebSocket đã kết nối: {}", session.getId());
-
         // Trích xuất token từ query string hoặc headers
         String token = extractToken(session);
         if (token == null) {
             try {
                 session.close(CloseStatus.BAD_DATA.withReason("No token provided"));
             } catch (IOException e) {
-                log.error("Lỗi khi đóng session", e);
             }
             return;
         }
@@ -68,14 +67,12 @@ public class WatchTogetherHandler extends TextWebSocketHandler {
             try {
                 session.close(CloseStatus.BAD_DATA.withReason("Invalid token"));
             } catch (IOException e) {
-                log.error("Lỗi khi đóng session", e);
             }
             return;
         }
 
         sessionToUser.put(session.getId(), user);
         sendMessage(session, "connection", Map.of("connected", true));
-        log.info("User đã được xác thực: {} ({})", user.getUsername(), user.getId());
     }
 
     /**
@@ -91,8 +88,6 @@ public class WatchTogetherHandler extends TextWebSocketHandler {
             String event = (String) payload.get("event");
             String roomId = (String) payload.get("roomId");
 
-            log.debug("Nhận được event: {} cho room: {} từ session: {}", event, roomId, session.getId());
-
             switch (event) {
                 case "join-room":
                     handleJoinRoom(session, roomId, payload);
@@ -106,6 +101,9 @@ public class WatchTogetherHandler extends TextWebSocketHandler {
                 case "sync-playback":
                     handleSyncPlayback(session, roomId, payload);
                     break;
+                case "change-episode":
+                    handleChangeEpisode(session, roomId, payload);
+                    break;
                 case "get-room-users":
                     handleGetRoomUsers(session, roomId);
                     break;
@@ -116,10 +114,9 @@ public class WatchTogetherHandler extends TextWebSocketHandler {
                     handleTestConnection(session, payload);
                     break;
                 default:
-                    log.warn("Event không xác định: {}", event);
+                    break;
             }
         } catch (Exception e) {
-            log.error("Lỗi khi xử lý message", e);
         }
     }
 
@@ -134,26 +131,19 @@ public class WatchTogetherHandler extends TextWebSocketHandler {
      * - Gửi danh sách users hiện tại trong room cho user mới
      */
     private void handleJoinRoom(WebSocketSession session, String roomId, Map<String, Object> data) {
-        log.info("handleJoinRoom được gọi - session: {}, roomId: {}", session.getId(), roomId);
-
         if (roomId == null || roomId.isEmpty()) {
-            log.warn("roomId không hợp lệ");
             return;
         }
 
         // Xác minh room tồn tại (chỉ check exists, không cần load full data)
         boolean roomExists = roomRepository.findActiveRoomById(roomId).isPresent();
         if (!roomExists) {
-            log.error("Không tìm thấy room: {}", roomId);
             return;
         }
-        log.debug("Room {} tồn tại trong database", roomId);
 
         // Xóa khỏi room cũ nếu có
         String previousRoomId = sessionToRoom.get(session.getId());
         if (previousRoomId != null && !previousRoomId.equals(roomId)) {
-            log.info("Session {} đang ở room cũ: {}, chuyển sang room mới: {}",
-                    session.getId(), previousRoomId, roomId);
             handleLeaveRoom(session, previousRoomId);
         }
 
@@ -161,22 +151,15 @@ public class WatchTogetherHandler extends TextWebSocketHandler {
         rooms.computeIfAbsent(roomId, k -> ConcurrentHashMap.newKeySet()).add(session);
         sessionToRoom.put(session.getId(), roomId);
 
-        log.info("Đã thêm session {} vào room {}. Tổng số sessions trong room: {}",
-                session.getId(), roomId, rooms.get(roomId).size());
-        log.debug("Danh sách rooms hiện có: {}", rooms.keySet());
-
         UserInfo user = sessionToUser.get(session.getId());
         if (user == null) {
-            log.error("Không tìm thấy user info cho session: {}", session.getId());
             return;
         }
 
         // Thêm user vào room trong database
         try {
             watchTogetherService.addUserToRoom(roomId, user.getId());
-            log.debug("Đã thêm user {} vào room {} trong database", user.getId(), roomId);
         } catch (Exception e) {
-            log.error("Lỗi khi thêm user vào room trong database", e);
         }
 
         // Thông báo cho các user khác
@@ -203,8 +186,22 @@ public class WatchTogetherHandler extends TextWebSocketHandler {
         }
 
         sendMessage(session, "room-users", Map.of("users", users));
-        log.info("User {} đã join room {}. Tổng số users trong room: {}",
-                user.getUsername(), roomId, users.size());
+
+        // Gửi thông tin creator để frontend biết ai là host
+        Optional<com.example.thangcachep.movie_project_be.entities.WatchTogetherRoomEntity> roomOpt =
+                roomRepository.findActiveRoomById(roomId);
+        if (roomOpt.isPresent()) {
+            com.example.thangcachep.movie_project_be.entities.WatchTogetherRoomEntity room = roomOpt.get();
+            if (room.getCreatedBy() != null) {
+                sendMessage(session, "room-info", Map.of(
+                        "roomId", roomId,
+                        "creatorId", room.getCreatedBy().getId(),
+                        "isHost", room.getCreatedBy().getId().equals(user.getId())
+                ));
+            }
+            // Update lastActivityAt khi có user join
+            updateRoomActivity(roomId);
+        }
     }
 
     /**
@@ -235,13 +232,11 @@ public class WatchTogetherHandler extends TextWebSocketHandler {
             try {
                 watchTogetherService.removeUserFromRoom(roomId, user.getId());
             } catch (Exception e) {
-                log.error("Lỗi khi xóa user khỏi room trong database", e);
             }
 
             broadcastToRoom(roomId, null, "user-left", Map.of(
                     "userId", user.getId()
             ));
-            log.info("User {} đã rời khỏi room {}", user.getUsername(), roomId);
         }
     }
 
@@ -254,12 +249,7 @@ public class WatchTogetherHandler extends TextWebSocketHandler {
      * - Broadcast message đến tất cả users trong room (bao gồm cả người gửi)
      */
     private void handleChatMessage(WebSocketSession session, String roomId, Map<String, Object> data) {
-        log.info("handleChatMessage được gọi - session: {}, roomId: {}, data keys: {}",
-                session.getId(), roomId, data != null ? data.keySet() : "null");
-
         if (roomId == null || !data.containsKey("message")) {
-            log.warn("handleChatMessage: Request không hợp lệ - roomId: {}, hasMessage: {}",
-                    roomId, data != null && data.containsKey("message"));
             return;
         }
 
@@ -267,28 +257,20 @@ public class WatchTogetherHandler extends TextWebSocketHandler {
         UserInfo user = sessionToUser.get(session.getId());
 
         if (user == null) {
-            log.warn("handleChatMessage: Không tìm thấy user cho session: {}", session.getId());
             return;
         }
 
         // Kiểm tra xem session đã join room chưa
         String currentRoomId = sessionToRoom.get(session.getId());
         if (currentRoomId == null || !currentRoomId.equals(roomId)) {
-            log.warn("handleChatMessage: Session {} chưa join room {}. Đang tự động join...",
-                    session.getId(), roomId);
             // Tự động join room
             handleJoinRoom(session, roomId, data);
             // Kiểm tra lại sau khi join
             currentRoomId = sessionToRoom.get(session.getId());
             if (currentRoomId == null || !currentRoomId.equals(roomId)) {
-                log.error("handleChatMessage: Không thể join room {} cho session {}",
-                        roomId, session.getId());
                 return;
             }
         }
-
-        log.info("handleChatMessage: Đang xử lý message từ user {} ({}): {}",
-                user.getUsername(), user.getId(), message);
 
         Map<String, Object> messageData = Map.of(
                 "id", System.currentTimeMillis(),
@@ -298,19 +280,40 @@ public class WatchTogetherHandler extends TextWebSocketHandler {
                 "timestamp", new Date()
         );
 
-        log.info("handleChatMessage: Đang broadcast đến room: {}", roomId);
         broadcastToRoom(roomId, null, "chat-message", Map.of("message", messageData));
-        log.info("handleChatMessage: Broadcast hoàn tất");
+
+        // Update lastActivityAt khi có chat message
+        updateRoomActivity(roomId);
     }
 
     /**
      * Xử lý đồng bộ playback (thời gian phát, trạng thái play/pause)
-     * - Kiểm tra roomId hợp lệ
+     * - Chỉ người tạo phòng (creator/host) mới được gửi sync
+     * - Kiểm tra roomId hợp lệ và user có phải creator không
      * - Trích xuất currentTime và isPlaying từ data
      * - Broadcast playback state đến tất cả users khác trong room (không gửi lại cho người gửi)
      */
     private void handleSyncPlayback(WebSocketSession session, String roomId, Map<String, Object> data) {
         if (roomId == null) {
+            return;
+        }
+
+        // Kiểm tra user có phải là creator của room không
+        UserInfo user = sessionToUser.get(session.getId());
+        if (user == null) {
+            return;
+        }
+
+        // Lấy thông tin room từ database để kiểm tra creator
+        Optional<com.example.thangcachep.movie_project_be.entities.WatchTogetherRoomEntity> roomOpt =
+                roomRepository.findActiveRoomById(roomId);
+        if (roomOpt.isEmpty()) {
+            return;
+        }
+
+        com.example.thangcachep.movie_project_be.entities.WatchTogetherRoomEntity room = roomOpt.get();
+        if (room.getCreatedBy() == null || !room.getCreatedBy().getId().equals(user.getId())) {
+            // Không phải creator, không cho phép sync
             return;
         }
 
@@ -324,6 +327,55 @@ public class WatchTogetherHandler extends TextWebSocketHandler {
         }
 
         broadcastToRoom(roomId, session, "playback-sync", playbackState);
+
+        // Update lastActivityAt khi có sync playback
+        updateRoomActivity(roomId);
+    }
+
+    /**
+     * Xử lý thay đổi tập phim (chỉ host mới được phép)
+     * - Kiểm tra user có phải là creator của room không
+     * - Broadcast episode change đến tất cả users khác trong room
+     * - Kèm theo playback state nếu có
+     */
+    private void handleChangeEpisode(WebSocketSession session, String roomId, Map<String, Object> data) {
+        if (roomId == null) {
+            return;
+        }
+
+        UserInfo user = sessionToUser.get(session.getId());
+        if (user == null) {
+            return;
+        }
+
+        Optional<com.example.thangcachep.movie_project_be.entities.WatchTogetherRoomEntity> roomOpt =
+                roomRepository.findActiveRoomById(roomId);
+        if (roomOpt.isEmpty()) {
+            return;
+        }
+
+        com.example.thangcachep.movie_project_be.entities.WatchTogetherRoomEntity room = roomOpt.get();
+        if (room.getCreatedBy() == null || !room.getCreatedBy().getId().equals(user.getId())) {
+            return;
+        }
+
+        Map<String, Object> episodeData = new HashMap<>();
+        if (data.containsKey("episodeId")) {
+            episodeData.put("episodeId", data.get("episodeId"));
+        }
+        if (data.containsKey("episodeNumber")) {
+            episodeData.put("episodeNumber", data.get("episodeNumber"));
+        }
+        if (data.containsKey("currentTime")) {
+            episodeData.put("currentTime", data.get("currentTime"));
+        }
+        if (data.containsKey("isPlaying")) {
+            episodeData.put("isPlaying", data.get("isPlaying"));
+        }
+
+        broadcastToRoom(roomId, session, "episode-change", episodeData);
+
+        updateRoomActivity(roomId);
     }
 
     /**
@@ -335,7 +387,6 @@ public class WatchTogetherHandler extends TextWebSocketHandler {
      */
     private void handleGetRoomUsers(WebSocketSession session, String roomId) {
         if (roomId == null) {
-            log.warn("get-room-users: roomId không hợp lệ");
             return;
         }
 
@@ -355,7 +406,6 @@ public class WatchTogetherHandler extends TextWebSocketHandler {
         }
 
         sendMessage(session, "get-room-users", Map.of("users", users));
-        log.debug("Đã gửi danh sách users trong room đến session {}: {} users", session.getId(), users.size());
     }
 
     /**
@@ -366,7 +416,6 @@ public class WatchTogetherHandler extends TextWebSocketHandler {
      */
     private void handleGetRoomMessages(WebSocketSession session, String roomId) {
         if (roomId == null) {
-            log.warn("get-room-messages: roomId không hợp lệ");
             return;
         }
 
@@ -375,7 +424,6 @@ public class WatchTogetherHandler extends TextWebSocketHandler {
         List<Map<String, Object>> messages = new ArrayList<>();
 
         sendMessage(session, "get-room-messages", Map.of("messages", messages));
-        log.debug("Đã gửi danh sách messages trong room đến session {}: {} messages", session.getId(), messages.size());
     }
 
     /**
@@ -388,9 +436,6 @@ public class WatchTogetherHandler extends TextWebSocketHandler {
         String testId = (String) data.get("testId");
         String roomId = (String) data.get("roomId");
 
-        log.info("Nhận được test connection từ session {}: testId={}, roomId={}",
-                session.getId(), testId, roomId);
-
         Map<String, Object> response = new HashMap<>();
         response.put("event", "test-connection-response");
         response.put("testId", testId);
@@ -399,7 +444,6 @@ public class WatchTogetherHandler extends TextWebSocketHandler {
         response.put("serverTime", System.currentTimeMillis());
 
         sendMessage(session, "test-connection-response", response);
-        log.info("Đã gửi test connection response đến session {}", session.getId());
     }
 
     /**
@@ -412,54 +456,33 @@ public class WatchTogetherHandler extends TextWebSocketHandler {
      */
     private void broadcastToRoom(String roomId, WebSocketSession exclude,
                                  String event, Map<String, Object> data) {
-        log.info("broadcastToRoom được gọi - roomId: {}, event: {}, exclude: {}",
-                roomId, event, exclude != null ? exclude.getId() : "null");
-
         Set<WebSocketSession> roomSessions = rooms.get(roomId);
         if (roomSessions == null) {
-            log.warn("broadcastToRoom: Không tìm thấy room {} trong rooms map. Các rooms hiện có: {}",
-                    roomId, rooms.keySet());
             return;
         }
-
-        log.info("broadcastToRoom: Room {} có {} sessions", roomId, roomSessions.size());
 
         Map<String, Object> message = Map.of("event", event, "data", data);
         String json;
         try {
             json = objectMapper.writeValueAsString(message);
-            log.info("broadcastToRoom: Message JSON: {}", json);
         } catch (Exception e) {
-            log.error("broadcastToRoom: Lỗi khi serialize message", e);
             return;
         }
 
-        int sentCount = 0;
-        int skippedCount = 0;
         for (WebSocketSession session : roomSessions) {
             if (session == exclude) {
-                log.debug("broadcastToRoom: Bỏ qua session bị exclude: {}", session.getId());
-                skippedCount++;
                 continue;
             }
 
             if (!session.isOpen()) {
-                log.warn("broadcastToRoom: Session {} không mở, bỏ qua", session.getId());
-                skippedCount++;
                 continue;
             }
 
             try {
                 session.sendMessage(new TextMessage(json));
-                sentCount++;
-                log.info("broadcastToRoom: Đã gửi message đến session: {}", session.getId());
             } catch (IOException e) {
-                log.error("broadcastToRoom: Lỗi khi gửi message đến session: {}", session.getId(), e);
             }
         }
-
-        log.info("broadcastToRoom: Hoàn tất - đã gửi: {}, bỏ qua: {}, tổng sessions: {}",
-                sentCount, skippedCount, roomSessions.size());
     }
 
     /**
@@ -474,7 +497,6 @@ public class WatchTogetherHandler extends TextWebSocketHandler {
             String json = objectMapper.writeValueAsString(message);
             session.sendMessage(new TextMessage(json));
         } catch (Exception e) {
-            log.error("Lỗi khi gửi message", e);
         }
     }
 
@@ -486,18 +508,12 @@ public class WatchTogetherHandler extends TextWebSocketHandler {
      */
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-        log.info("WebSocket connection đã đóng: {} với status: {}", session.getId(), status);
-
         String roomId = sessionToRoom.remove(session.getId());
-        log.debug("Session {} đang ở room: {}", session.getId(), roomId);
-        log.debug("Danh sách rooms trước khi xóa: {}", rooms.keySet());
 
         if (roomId != null) {
             handleLeaveRoom(session, roomId);
         }
         sessionToUser.remove(session.getId());
-
-        log.debug("Danh sách rooms sau khi xóa: {}", rooms.keySet());
     }
 
     /**
@@ -532,7 +548,6 @@ public class WatchTogetherHandler extends TextWebSocketHandler {
         try {
             String email = jwtService.extractUsername(token);
             if (email == null) {
-                log.warn("Không thể trích xuất email từ token");
                 return null;
             }
 
@@ -540,28 +555,39 @@ public class WatchTogetherHandler extends TextWebSocketHandler {
                     .orElse(null);
 
             if (user == null) {
-                log.warn("Không tìm thấy user với email: {}", email);
                 return null;
             }
 
             // Xác minh token hợp lệ
             if (!jwtService.validateToken(token, user)) {
-                log.warn("Token không hợp lệ cho user: {}", email);
                 return null;
             }
 
-            log.debug("Xác thực thành công cho user: {} ({})", user.getName(), user.getId());
             return new UserInfo(user.getId(), user.getName());
         } catch (ExpiredJwtException e) {
-            log.warn("Token đã hết hạn - Expired at: {}, Current time: {}",
-                    e.getClaims().getExpiration(), new Date());
             return null;
         } catch (JwtException e) {
-            log.warn("Lỗi JWT: {}", e.getMessage());
             return null;
         } catch (Exception e) {
-            log.error("Lỗi không xác định khi xác thực user", e);
             return null;
+        }
+    }
+
+    /**
+     * Cập nhật lastActivityAt của room khi có activity
+     * - Gọi khi có user join, chat message, hoặc sync playback
+     */
+    private void updateRoomActivity(String roomId) {
+        try {
+            Optional<WatchTogetherRoomEntity> roomOpt =
+                    roomRepository.findActiveRoomById(roomId);
+            if (roomOpt.isPresent()) {
+                WatchTogetherRoomEntity room = roomOpt.get();
+                room.setLastActivityAt(LocalDateTime.now());
+                roomRepository.save(room);
+            }
+        } catch (Exception e) {
+            // Ignore errors khi update activity
         }
     }
 

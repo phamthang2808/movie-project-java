@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 
 import com.example.thangcachep.movie_project_be.entities.CategoryEntity;
+import com.example.thangcachep.movie_project_be.entities.EpisodeEntity;
 import com.example.thangcachep.movie_project_be.entities.FavoriteEntity;
 import com.example.thangcachep.movie_project_be.entities.MovieEntity;
 import com.example.thangcachep.movie_project_be.entities.UserEntity;
@@ -26,6 +27,7 @@ import com.example.thangcachep.movie_project_be.entities.WatchHistoryEntity;
 import com.example.thangcachep.movie_project_be.entities.WatchlistEntity;
 import com.example.thangcachep.movie_project_be.exceptions.DataNotFoundException;
 import com.example.thangcachep.movie_project_be.models.request.MovieRequest;
+import com.example.thangcachep.movie_project_be.models.responses.EpisodeResponse;
 import com.example.thangcachep.movie_project_be.models.responses.MovieResponse;
 import com.example.thangcachep.movie_project_be.repositories.CategoryRepository;
 import com.example.thangcachep.movie_project_be.repositories.EpisodeRepository;
@@ -122,6 +124,42 @@ public class MovieService {
         MovieEntity movie = movieRepository.findByIdWithCategories(id)
                 .orElseThrow(() -> new DataNotFoundException("Không tìm thấy phim với ID: " + id));
         return mapToMovieResponse(movie);
+    }
+
+    /**
+     * Lấy danh sách episodes của một phim bộ
+     * Chỉ lấy các episode active, sắp xếp theo episodeNumber
+     */
+    public List<EpisodeResponse> getEpisodesByMovieId(Long movieId) {
+        // Kiểm tra phim có tồn tại không
+        movieRepository.findById(movieId)
+                .orElseThrow(() -> new DataNotFoundException("Không tìm thấy phim với ID: " + movieId));
+
+        // Lấy danh sách episodes, chỉ lấy active, sắp xếp theo episodeNumber
+        List<EpisodeEntity> episodes = episodeRepository.findByMovieIdOrderByEpisodeNumberAsc(movieId);
+
+        // Filter chỉ lấy active episodes
+        return episodes.stream()
+                .filter(episode -> episode.getIsActive() != null && episode.getIsActive())
+                .map(this::mapToEpisodeResponse)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Map EpisodeEntity sang EpisodeResponse
+     */
+    private EpisodeResponse mapToEpisodeResponse(EpisodeEntity episode) {
+        return EpisodeResponse.builder()
+                .id(episode.getId())
+                .movieId(episode.getMovie().getId())
+                .episodeNumber(episode.getEpisodeNumber())
+                .title(episode.getTitle())
+                .description(episode.getDescription())
+                .videoUrl(episode.getVideoUrl())
+                .duration(episode.getDuration())
+                .isVipOnly(episode.getIsVipOnly())
+                .isActive(episode.getIsActive())
+                .build();
     }
 
     public Page<MovieResponse> searchMovies(String keyword, Pageable pageable) {

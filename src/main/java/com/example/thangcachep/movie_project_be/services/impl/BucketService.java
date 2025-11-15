@@ -47,12 +47,19 @@ public class BucketService {
         }
         String uniqueFileName = UUID.randomUUID().toString() + fileExtension;
 
-        // 2. Chuẩn bị yêu cầu Upload
-        PutObjectRequest putObjectRequest = PutObjectRequest.builder()
+        // 2. Chuẩn bị yêu cầu Upload với metadata tối ưu
+        PutObjectRequest.Builder requestBuilder = PutObjectRequest.builder()
                 .bucket(bucketName)
                 .key(uniqueFileName) // Tên file trên S3
-                .contentType(file.getContentType()) // Báo cho S3 biết đây là file gì (video/mp4, image/jpeg...)
-                .build();
+                .contentType(file.getContentType()); // Báo cho S3 biết đây là file gì (video/mp4, image/jpeg...)
+
+        // Tối ưu cho video files - Sử dụng cacheControl() thay vì metadata()
+        if (file.getContentType() != null && file.getContentType().startsWith("video/")) {
+            // Set cache control cho video (S3 sẽ tự động set header này)
+            requestBuilder.cacheControl("public, max-age=31536000, immutable");
+        }
+
+        PutObjectRequest putObjectRequest = requestBuilder.build();
 
         // 3. Gửi file (dưới dạng InputStream) lên AWS S3
         s3Client.putObject(putObjectRequest, RequestBody.fromInputStream(

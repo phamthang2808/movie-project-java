@@ -1,5 +1,6 @@
 package com.example.thangcachep.movie_project_be.controllers;
 
+import com.example.thangcachep.movie_project_be.entities.UserEntity;
 import com.example.thangcachep.movie_project_be.exceptions.PermissionDenyException;
 import com.example.thangcachep.movie_project_be.models.request.CreateRoomRequest;
 import com.example.thangcachep.movie_project_be.models.responses.WatchTogetherRoomResponse;
@@ -7,6 +8,7 @@ import com.example.thangcachep.movie_project_be.services.IWatchTogetherService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,12 +22,11 @@ public class WatchTogetherController {
 
     private final IWatchTogetherService watchTogetherService;
 
-    private com.example.thangcachep.movie_project_be.entities.UserEntity getCurrentUser() {
-        org.springframework.security.core.Authentication authentication =
-                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+    private UserEntity getCurrentUser() {
+      Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
-        if (authentication != null && authentication.getPrincipal() instanceof com.example.thangcachep.movie_project_be.entities.UserEntity) {
-            return (com.example.thangcachep.movie_project_be.entities.UserEntity) authentication.getPrincipal();
+        if (authentication != null && authentication.getPrincipal() instanceof UserEntity) {
+            return (UserEntity) authentication.getPrincipal();
         }
         return null;
     }
@@ -33,7 +34,7 @@ public class WatchTogetherController {
     @PostMapping("/rooms")
     public ResponseEntity<WatchTogetherRoomResponse> createRoom(
             @Valid @RequestBody CreateRoomRequest request) {
-        com.example.thangcachep.movie_project_be.entities.UserEntity currentUser = getCurrentUser();
+     UserEntity currentUser = getCurrentUser();
         if (currentUser == null) {
             return ResponseEntity.status(401).build();
         }
