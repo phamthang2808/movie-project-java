@@ -8,6 +8,7 @@ import com.example.thangcachep.movie_project_be.models.dto.MovieDTO;
 import com.example.thangcachep.movie_project_be.repositories.FeaturedMovieRepository;
 import com.example.thangcachep.movie_project_be.services.IFeaturedMovieService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,8 +25,13 @@ public class FeaturedMovieService implements IFeaturedMovieService {
 
     private final FeaturedMovieRepository featuredMovieRepository;
 
+    /**
+     * Get featured movies - Cache 1 giờ
+     * Cache key: "featured:movies"
+     */
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = "movies", key = "'featured:movies'")
     public List<FeaturedMovieDTO> getFeaturedMovies() {
         List<FeaturedMovieEntity> entities = featuredMovieRepository.findAllActiveOrderByDisplayOrder();
         return entities.stream()

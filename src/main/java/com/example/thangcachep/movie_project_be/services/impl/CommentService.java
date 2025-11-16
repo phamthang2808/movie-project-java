@@ -4,6 +4,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +34,7 @@ public class CommentService {
      * Tạo comment mới
      */
     @Transactional
+    @CacheEvict(value = {"comments", "movies"}, allEntries = true)
     public CommentResponse createComment(Long movieId, CommentRequest request, UserEntity user) {
         // Kiểm tra movie có tồn tại không
         MovieEntity movie = movieRepository.findById(movieId)
@@ -293,8 +296,10 @@ public class CommentService {
      * @param search Từ khóa tìm kiếm (content, user name, movie title)
      * @param status Lọc theo status (PENDING, APPROVED, REJECTED)
      * @return Danh sách CommentResponse với đầy đủ thông tin
+     * Cache: 10 phút, cache key dựa trên search và status
      */
     @Transactional(readOnly = true)
+    @Cacheable(value = "comments", key = "'admin:comments:all:' + (#search != null ? #search : '') + ':' + (#status != null ? #status : 'all')")
     public List<CommentResponse> getAllComments(String search, String status) {
         try {
             List<CommentEntity> comments;
@@ -399,6 +404,7 @@ public class CommentService {
      * @return CommentResponse đã được duyệt
      */
     @Transactional
+    @CacheEvict(value = {"comments", "movies"}, allEntries = true)
     public CommentResponse approveComment(Long commentId, UserEntity admin) throws DataNotFoundException {
         CommentEntity comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new DataNotFoundException("Không tìm thấy comment với ID: " + commentId));
@@ -426,6 +432,7 @@ public class CommentService {
      * @return CommentResponse đã bị từ chối
      */
     @Transactional
+    @CacheEvict(value = {"comments", "movies"}, allEntries = true)
     public CommentResponse rejectComment(Long commentId, UserEntity admin) throws DataNotFoundException {
         CommentEntity comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new DataNotFoundException("Không tìm thấy comment với ID: " + commentId));
@@ -451,6 +458,7 @@ public class CommentService {
      * @param commentId ID của comment
      */
     @Transactional
+    @CacheEvict(value = {"comments", "movies"}, allEntries = true)
     public void deleteComment(Long commentId) throws DataNotFoundException {
         // Kiểm tra comment có tồn tại không
         if (!commentRepository.existsById(commentId)) {

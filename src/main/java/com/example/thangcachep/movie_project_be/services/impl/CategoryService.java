@@ -3,6 +3,8 @@ package com.example.thangcachep.movie_project_be.services.impl;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +21,11 @@ public class CategoryService {
 
     private final CategoryRepository categoryRepository;
 
+    /**
+     * Lấy tất cả categories
+     * Cache: 6 giờ (categories ít thay đổi)
+     */
+    @Cacheable(value = "categories", key = "'all'")
     public List<CategoryResponse> getAllCategories() {
         List<CategoryEntity> categories = categoryRepository.findAll();
         return categories.stream()
@@ -33,6 +40,7 @@ public class CategoryService {
     }
 
     @Transactional
+    @CacheEvict(value = "categories", allEntries = true)
     public CategoryResponse createCategory(CategoryRequest request) {
         // Kiểm tra tên category đã tồn tại chưa
         if (categoryRepository.existsByName(request.getName())) {
@@ -55,6 +63,7 @@ public class CategoryService {
     }
 
     @Transactional
+    @CacheEvict(value = "categories", allEntries = true)
     public CategoryResponse updateCategory(Long id, CategoryRequest request) {
         CategoryEntity category = categoryRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy thể loại với ID: " + id));
@@ -98,6 +107,7 @@ public class CategoryService {
     }
 
     @Transactional
+    @CacheEvict(value = "categories", allEntries = true)
     public void deleteCategory(Long id) {
         CategoryEntity category = categoryRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy thể loại với ID: " + id));

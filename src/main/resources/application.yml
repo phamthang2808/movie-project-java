@@ -3,6 +3,8 @@ server:
   error:
     include-message: always
     include-binding-errors: always
+  # Timeout cho request lớn (video upload)
+  connection-timeout: 1800000 # 30 phút (30 * 60 * 1000 ms)
 
 spring:
   application:
@@ -44,6 +46,23 @@ spring:
       max-file-size: 2GB
       max-request-size: 2GB
       file-size-threshold: 10MB # Buffer size trước khi ghi vào disk
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+    default-property-inclusion: non_null
   messages:
     basename: i18n/messages
     encoding: UTF-8

@@ -1,5 +1,6 @@
 package com.example.thangcachep.movie_project_be.services.impl;
 
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -7,16 +8,15 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
 
 import com.example.thangcachep.movie_project_be.entities.CategoryEntity;
 import com.example.thangcachep.movie_project_be.entities.EpisodeEntity;
@@ -100,7 +100,9 @@ public class MovieService {
      * Nếu includeInactive = true, mới lấy cả phim đã xóa
      *
      * Tối ưu: Sử dụng JOIN FETCH để load categories cùng lúc, tránh N+1 query problem
+     * Cache: 30 phút, cache key dựa trên includeInactive
      */
+    @Cacheable(value = "movies", key = "'admin:movies:all:' + (#includeInactive != null ? #includeInactive : false)")
     public List<MovieResponse> getAllMoviesWithoutPagination(Boolean includeInactive) {
         List<MovieEntity> movies;
 
@@ -119,6 +121,11 @@ public class MovieService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Get movie by ID
+     * LƯU Ý: Tạm thời không cache vì GenericJackson2JsonRedisSerializer không thể deserialize đúng Builder pattern
+     * TODO: Sửa lại sau khi cấu hình ObjectMapper đúng cách
+     */
     public MovieResponse getMovieById(Long id) {
         // Sử dụng query tối ưu với JOIN FETCH để load categories cùng lúc
         MovieEntity movie = movieRepository.findByIdWithCategories(id)
@@ -129,6 +136,7 @@ public class MovieService {
     /**
      * Lấy danh sách episodes của một phim bộ
      * Chỉ lấy các episode active, sắp xếp theo episodeNumber
+     * LƯU Ý: Không cache vì List<EpisodeResponse> có thể gặp lỗi deserialize từ Redis
      */
     public List<EpisodeResponse> getEpisodesByMovieId(Long movieId) {
         // Kiểm tra phim có tồn tại không
@@ -167,6 +175,11 @@ public class MovieService {
         return movies.map(this::mapToMovieResponse);
     }
 
+    /**
+     * Get trending movies - Cache 30 phút
+     * Cache key: "trending:movies"
+     */
+    @Cacheable(value = "topMovies", key = "'trending:movies'")
     public List<MovieResponse> getTrendingMovies() {
         List<MovieEntity> movies = movieRepository.findTopViewedMovies(PageRequest.of(0, 10));
         return movies.stream()
@@ -174,6 +187,11 @@ public class MovieService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Get top movies week - Cache 30 phút (thay đổi thường xuyên hơn)
+     * Cache key: "top:week"
+     */
+    @Cacheable(value = "topMovies", key = "'top:week'")
     public List<MovieResponse> getTopMoviesWeek() {
         List<MovieEntity> movies = movieRepository.findTopRatedMovies(PageRequest.of(0, 10));
         return movies.stream()
@@ -181,6 +199,11 @@ public class MovieService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Get movies by category
+     * LƯU Ý: Không cache Page object vì Page không thể deserialize đúng từ Redis
+     * (Page sẽ bị chuyển thành LinkedHashMap khi deserialize)
+     */
     public Page<MovieResponse> getMoviesByCategory(Long categoryId, Pageable pageable) {
         Page<MovieEntity> movies = movieRepository.findByCategoryId(categoryId, pageable);
         return movies.map(this::mapToMovieResponse);
@@ -189,7 +212,9 @@ public class MovieService {
     /**
      * Lấy danh sách phim đề xuất dựa trên phim hiện tại
      * Logic: Lấy phim cùng thể loại, cùng type, có rating cao, loại trừ phim hiện tại
+     * Cache 1 giờ - Cache key: "recommended:{movieId}"
      */
+    @Cacheable(value = "movies", key = "'recommended:' + #movieId")
     public List<MovieResponse> getRecommendedMovies(Long movieId) {
         // Lấy phim hiện tại
         MovieEntity currentMovie = movieRepository.findByIdWithCategories(movieId)
@@ -284,8 +309,10 @@ public class MovieService {
 
     /**
      * Tạo phim mới
+     * Clear cache khi tạo mới
      */
     @Transactional
+    @CacheEvict(value = {"movies", "topMovies"}, allEntries = true)
     public MovieResponse createMovie(MovieRequest request) {
         MovieEntity movie = new MovieEntity();
 
@@ -358,7 +385,11 @@ public class MovieService {
     /**
      * Cập nhật thông tin phim (bao gồm videoUrl)
      */
+    /**
+     * Update movie - Clear cache khi update
+     */
     @Transactional
+    @CacheEvict(value = {"movies", "topMovies"}, allEntries = true)
     public MovieResponse updateMovie(Long id, Map<String, Object> updates) throws DataNotFoundException {
         MovieEntity movie = movieRepository.findById(id)
                 .orElseThrow(() -> new DataNotFoundException("Không tìm thấy phim với ID: " + id));
@@ -467,7 +498,11 @@ public class MovieService {
      * Khác với rejectMovie (soft delete - chỉ set isActive = false)
      * Hành động này không thể hoàn tác - phim sẽ bị xóa vĩnh viễn
      */
+    /**
+     * Delete movie - Clear cache khi delete
+     */
     @Transactional
+    @CacheEvict(value = {"movies", "topMovies"}, allEntries = true)
     public void deleteMovie(Long id) throws DataNotFoundException {
         MovieEntity movie = movieRepository.findById(id)
                 .orElseThrow(() -> new DataNotFoundException("Không tìm thấy phim với ID: " + id));
@@ -829,8 +864,10 @@ public class MovieService {
 
     /**
      * Tạo phim mới cho Staff (status: PENDING)
+     * Clear cache khi tạo mới
      */
     @Transactional
+    @CacheEvict(value = {"movies", "topMovies"}, allEntries = true)
     public MovieResponse createMovieForStaff(MovieRequest request) {
         UserEntity currentUser = getCurrentUser();
         if (currentUser == null) {
@@ -851,8 +888,10 @@ public class MovieService {
 
     /**
      * Tạo phim mới cho Admin (status: ACTIVE/AIRING tùy chọn)
+     * Clear cache khi tạo mới
      */
     @Transactional
+    @CacheEvict(value = {"movies", "topMovies"}, allEntries = true)
     public MovieResponse createMovieForAdmin(MovieRequest request) {
         UserEntity currentUser = getCurrentUser();
         if (currentUser == null) {
@@ -937,8 +976,10 @@ public class MovieService {
 
     /**
      * Cập nhật phim cho Staff (chỉ cho phép sửa phim PENDING hoặc phim do Staff đó tạo)
+     * Clear cache khi update
      */
     @Transactional
+    @CacheEvict(value = {"movies", "topMovies"}, allEntries = true)
     public MovieResponse updateMovieForStaff(Long id, Map<String, Object> updates) throws DataNotFoundException {
         UserEntity currentUser = getCurrentUser();
         if (currentUser == null) {

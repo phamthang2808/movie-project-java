@@ -4,6 +4,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -156,7 +158,9 @@ public class UserService {
      * @param search Từ khóa tìm kiếm (name hoặc email)
      * @param roleName Lọc theo role (ADMIN, STAFF, USER)
      * @return Danh sách UserResponse
+     * Cache: 15 phút, cache key dựa trên search và roleName
      */
+    @Cacheable(value = "users", key = "'admin:users:all:' + (#search != null ? #search : '') + ':' + (#roleName != null ? #roleName : 'all')")
     public List<UserResponse> getAllUsers(String search, String roleName) {
         List<UserEntity> users;
 
@@ -205,6 +209,7 @@ public class UserService {
      * @throws RuntimeException nếu không có quyền (ví dụ: xóa admin, xóa chính mình)
      */
     @Transactional
+    @CacheEvict(value = "users", allEntries = true)
     public UserResponse updateUser(Long userId, UserResponse request, UserEntity currentUser) throws DataNotFoundException {
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new DataNotFoundException("Không tìm thấy user với ID: " + userId));
@@ -269,6 +274,7 @@ public class UserService {
      * @throws RuntimeException nếu không có quyền
      */
     @Transactional
+    @CacheEvict(value = "users", allEntries = true)
     public UserResponse banUser(Long userId, UserEntity currentUser) throws DataNotFoundException {
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new DataNotFoundException("Không tìm thấy user với ID: " + userId));
@@ -298,6 +304,7 @@ public class UserService {
      * @throws RuntimeException nếu không có quyền
      */
     @Transactional
+    @CacheEvict(value = "users", allEntries = true)
     public void deleteUser(Long userId, UserEntity currentUser) throws DataNotFoundException {
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new DataNotFoundException("Không tìm thấy user với ID: " + userId));
