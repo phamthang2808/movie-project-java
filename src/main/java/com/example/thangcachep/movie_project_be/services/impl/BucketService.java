@@ -2,13 +2,16 @@ package com.example.thangcachep.movie_project_be.services.impl;
 
 import java.io.IOException;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
@@ -17,9 +20,11 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 /**
  * AWS S3 Bucket Service
  * Xử lý upload và quản lý file trên AWS S3
+ * Sử dụng @Async cho delete operations để không block HTTP request
  */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class BucketService {
 
     @Autowired
@@ -73,7 +78,7 @@ public class BucketService {
     }
 
     /**
-     * Xóa file khỏi AWS S3
+     * Xóa file khỏi AWS S3 (Synchronous - dùng khi cần kết quả ngay)
      *
      * @param fileUrl URL của file cần xóa
      * @return true nếu xóa thành công
@@ -91,58 +96,41 @@ public class BucketService {
                     .build();
 
             s3Client.deleteObject(deleteRequest);
+            log.info("✅ Đã xóa file: {}", fileKey);
             return true;
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("❌ Lỗi khi xóa file: {}", fileUrl, e);
             return false;
         }
     }
 
-    // ==========================================
-    // DEPRECATED: Local Storage (Đã chuyển sang S3)
-    // ==========================================
-    // Method uploadAvatarToLocal() đã được thay thế bằng uploadFile() (S3)
-    // Giữ lại code này để reference, có thể xóa sau khi migrate xong
-
-    // @Autowired(required = false)
-    // private FileUploadProperties fileUploadProperties;
-
     /**
-     * @deprecated Đã chuyển sang dùng uploadFile() để upload lên AWS S3
-     * Upload avatar vào thư mục uploads local và trả về URL
-     * (KHÔNG CÒN DÙNG - Đã chuyển sang S3)
+     * Xóa file khỏi AWS S3 (Async - không block HTTP request)
+     * Dùng khi không cần chờ kết quả ngay
+     *
+     * @param fileUrl URL của file cần xóa
+     * @return CompletableFuture<Boolean> true nếu xóa thành công
      */
-    /*
-    public String uploadAvatarToLocal(MultipartFile file) throws IOException {
-        if (file == null || file.isEmpty()) {
-            throw new IllegalArgumentException("File cannot be null or empty");
+    @Async("fileExecutor")
+    public CompletableFuture<Boolean> deleteFileAsync(String fileUrl) {
+        try {
+            String fileKey = fileUrl.substring(publicUrl.length() + 1);
+
+            DeleteObjectRequest deleteRequest = DeleteObjectRequest.builder()
+                    .bucket(bucketName)
+                    .key(fileKey)
+                    .build();
+
+            s3Client.deleteObject(deleteRequest);
+            log.info("✅ Đã xóa file async: {}", fileKey);
+            return CompletableFuture.completedFuture(true);
+        } catch (Exception e) {
+            log.error("❌ Lỗi khi xóa file async: {}", fileUrl, e);
+            return CompletableFuture.completedFuture(false);
         }
-
-        String originalFilename = file.getOriginalFilename();
-        String filename = originalFilename != null ? StringUtils.cleanPath(originalFilename) : "";
-        String fileExtension = "";
-        if (filename != null && !filename.isEmpty() && filename.contains(".")) {
-            fileExtension = filename.substring(filename.lastIndexOf("."));
-        }
-        String uniqueFilename = UUID.randomUUID().toString() + fileExtension;
-
-        Path uploadDir;
-        if (fileUploadProperties != null && fileUploadProperties.getUploadDir() != null) {
-            uploadDir = Paths.get(fileUploadProperties.getUploadDir(), "avatars");
-        } else {
-            uploadDir = Paths.get("uploads", "avatars");
-        }
-
-        if (!Files.exists(uploadDir)) {
-            Files.createDirectories(uploadDir);
-        }
-
-        Path destination = uploadDir.resolve(uniqueFilename);
-        Files.copy(file.getInputStream(), destination, StandardCopyOption.REPLACE_EXISTING);
-
-        return "/uploads/avatars/" + uniqueFilename;
     }
-    */
+
+
 }
 
 

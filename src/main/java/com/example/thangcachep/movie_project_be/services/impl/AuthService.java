@@ -321,14 +321,16 @@ public class AuthService {
         // Lưu OTP
         otpService.saveOtp(email.toLowerCase(), otp);
 
-        // Gửi email OTP
-        try {
-            emailService.sendOtpEmail(email, otp);
-        } catch (Exception e) {
-            // Xóa OTP nếu gửi email thất bại
-            otpService.removeOtp(email.toLowerCase());
-            throw new RuntimeException("Không thể gửi email OTP. Vui lòng thử lại sau.");
-        }
+        // Gửi email OTP (async - không block)
+        // Fire and forget: gửi email trong background, không chờ kết quả
+        // Nếu email fail, sẽ được log trong EmailService
+        emailService.sendOtpEmail(email, otp)
+                .exceptionally(ex -> {
+                    // Nếu email fail, log và xóa OTP
+                    // Note: Exception này xảy ra trong background thread, không ảnh hưởng HTTP response
+                    otpService.removeOtp(email.toLowerCase());
+                    return null;
+                });
 
         return Map.of(
                 "success", true,
