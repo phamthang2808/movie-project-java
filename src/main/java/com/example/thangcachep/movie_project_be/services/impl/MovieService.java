@@ -130,7 +130,20 @@ public class MovieService {
         // Sử dụng query tối ưu với JOIN FETCH để load categories cùng lúc
         MovieEntity movie = movieRepository.findByIdWithCategories(id)
                 .orElseThrow(() -> new DataNotFoundException("Không tìm thấy phim với ID: " + id));
-        return mapToMovieResponse(movie);
+        return mapToMovieResponse(movie, null);
+    }
+
+    /**
+     * Lấy phim theo ID với check VIP
+     * @param id Movie ID
+     * @param userId User ID (có thể null nếu chưa đăng nhập)
+     * @return MovieResponse với videoUrl bị ẩn nếu không phải VIP
+     */
+    public MovieResponse getMovieById(Long id, Long userId) {
+        // Sử dụng query tối ưu với JOIN FETCH để load categories cùng lúc
+        MovieEntity movie = movieRepository.findByIdWithCategories(id)
+                .orElseThrow(() -> new DataNotFoundException("Không tìm thấy phim với ID: " + id));
+        return mapToMovieResponse(movie, userId);
     }
 
     /**
@@ -139,6 +152,16 @@ public class MovieService {
      * LƯU Ý: Không cache vì List<EpisodeResponse> có thể gặp lỗi deserialize từ Redis
      */
     public List<EpisodeResponse> getEpisodesByMovieId(Long movieId) {
+        return getEpisodesByMovieId(movieId, null);
+    }
+
+    /**
+     * Lấy danh sách episodes của một phim bộ với check VIP
+     * @param movieId Movie ID
+     * @param userId User ID (có thể null nếu chưa đăng nhập)
+     * @return List EpisodeResponse với videoUrl bị ẩn nếu không phải VIP
+     */
+    public List<EpisodeResponse> getEpisodesByMovieId(Long movieId, Long userId) {
         // Kiểm tra phim có tồn tại không
         movieRepository.findById(movieId)
                 .orElseThrow(() -> new DataNotFoundException("Không tìm thấy phim với ID: " + movieId));
@@ -146,10 +169,13 @@ public class MovieService {
         // Lấy danh sách episodes, chỉ lấy active, sắp xếp theo episodeNumber
         List<EpisodeEntity> episodes = episodeRepository.findByMovieIdOrderByEpisodeNumberAsc(movieId);
 
-        // Filter chỉ lấy active episodes
+        // Kiểm tra user có phải VIP không
+        Boolean isUserVip = userId != null ? checkUserIsVip(userId) : false;
+
+        // Filter chỉ lấy active episodes và ẩn videoUrl nếu không phải VIP
         return episodes.stream()
                 .filter(episode -> episode.getIsActive() != null && episode.getIsActive())
-                .map(this::mapToEpisodeResponse)
+                .map(episode -> mapToEpisodeResponse(episode, isUserVip))
                 .collect(Collectors.toList());
     }
 
@@ -157,13 +183,29 @@ public class MovieService {
      * Map EpisodeEntity sang EpisodeResponse
      */
     private EpisodeResponse mapToEpisodeResponse(EpisodeEntity episode) {
+        return mapToEpisodeResponse(episode, false);
+    }
+
+    /**
+     * Map EpisodeEntity sang EpisodeResponse với check VIP
+     * @param episode EpisodeEntity
+     * @param isUserVip User có phải VIP không
+     * @return EpisodeResponse với videoUrl bị ẩn nếu episode là VIP và user không phải VIP
+     */
+    private EpisodeResponse mapToEpisodeResponse(EpisodeEntity episode, Boolean isUserVip) {
+        // Nếu episode là VIP và user không phải VIP → ẩn videoUrl
+        String videoUrl = episode.getVideoUrl();
+        if (Boolean.TRUE.equals(episode.getIsVipOnly()) && !Boolean.TRUE.equals(isUserVip)) {
+            videoUrl = null; // Ẩn videoUrl
+        }
+
         return EpisodeResponse.builder()
                 .id(episode.getId())
                 .movieId(episode.getMovie().getId())
                 .episodeNumber(episode.getEpisodeNumber())
                 .title(episode.getTitle())
                 .description(episode.getDescription())
-                .videoUrl(episode.getVideoUrl())
+                .videoUrl(videoUrl)
                 .duration(episode.getDuration())
                 .isVipOnly(episode.getIsVipOnly())
                 .isActive(episode.getIsActive())
@@ -512,6 +554,25 @@ public class MovieService {
     }
 
     private MovieResponse mapToMovieResponse(MovieEntity movie) {
+        return mapToMovieResponse(movie, null);
+    }
+
+    /**
+     * Map MovieEntity sang MovieResponse với check VIP
+     * @param movie MovieEntity
+     * @param userId User ID (có thể null nếu chưa đăng nhập)
+     * @return MovieResponse với videoUrl bị ẩn nếu phim là VIP và user không phải VIP
+     */
+    private MovieResponse mapToMovieResponse(MovieEntity movie, Long userId) {
+        // Kiểm tra user có phải VIP không
+        Boolean isUserVip = userId != null ? checkUserIsVip(userId) : false;
+
+        // Nếu phim là VIP và user không phải VIP → ẩn videoUrl
+        String videoUrl = movie.getVideoUrl();
+        if (Boolean.TRUE.equals(movie.getIsVipOnly()) && !Boolean.TRUE.equals(isUserVip)) {
+            videoUrl = null; // Ẩn videoUrl
+        }
+
         MovieResponse.MovieResponseBuilder builder = MovieResponse.builder()
                 .id(movie.getId())
                 .title(movie.getTitle())
@@ -519,7 +580,7 @@ public class MovieService {
                 .posterUrl(movie.getPosterUrl())
                 .backdropUrl(movie.getBackdropUrl())
                 .trailerUrl(movie.getTrailerUrl())
-                .videoUrl(movie.getVideoUrl())
+                .videoUrl(videoUrl)
                 .type(movie.getType().name())
                 .status(movie.getStatus() != null ? movie.getStatus().name() : "UPCOMING")
                 .duration(movie.getDuration())
@@ -558,6 +619,37 @@ public class MovieService {
         }
 
         return builder.build();
+    }
+
+    /**
+     * Kiểm tra user có phải VIP không
+     * @param userId User ID
+     * @return true nếu user là VIP và chưa hết hạn
+     */
+    private Boolean checkUserIsVip(Long userId) {
+        try {
+            UserEntity user = userRepository.findById(userId)
+                    .orElse(null);
+
+            if (user == null) {
+                return false;
+            }
+
+            // Kiểm tra isVip = true
+            if (!Boolean.TRUE.equals(user.getIsVip())) {
+                return false;
+            }
+
+            // Nếu có vipExpiredAt, kiểm tra chưa hết hạn
+            if (user.getVipExpiredAt() != null) {
+                return user.getVipExpiredAt().isAfter(LocalDateTime.now());
+            }
+
+            // Nếu không có vipExpiredAt nhưng isVip = true → VIP vĩnh viễn
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     // ==========================================

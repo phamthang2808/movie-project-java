@@ -88,7 +88,11 @@ public class MovieController {
 
     @GetMapping("/{id}")
     public ResponseEntity<MovieResponse> getMovieById(@PathVariable Long id) {
-        MovieResponse movie = movieService.getMovieById(id);
+        // Lấy user hiện tại (có thể null nếu chưa đăng nhập)
+        UserEntity currentUser = getCurrentUser();
+        Long userId = currentUser != null ? currentUser.getId() : null;
+
+        MovieResponse movie = movieService.getMovieById(id, userId);
         return ResponseEntity.ok(movie);
     }
 
@@ -98,7 +102,11 @@ public class MovieController {
      */
     @GetMapping("/{movieId}/episodes")
     public ResponseEntity<List<EpisodeResponse>> getMovieEpisodes(@PathVariable Long movieId) {
-        List<EpisodeResponse> episodes = movieService.getEpisodesByMovieId(movieId);
+        // Lấy user hiện tại (có thể null nếu chưa đăng nhập)
+        UserEntity currentUser = getCurrentUser();
+        Long userId = currentUser != null ? currentUser.getId() : null;
+
+        List<EpisodeResponse> episodes = movieService.getEpisodesByMovieId(movieId, userId);
         return ResponseEntity.ok(episodes);
     }
 
