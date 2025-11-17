@@ -5,12 +5,14 @@ WORKDIR /app
 # Copy pom.xml and download dependencies
 COPY pom.xml .
 COPY lombok.config .
-RUN mvn dependency:go-offline -B
+# Download dependencies including Lombok explicitly
+RUN mvn dependency:resolve -B && mvn dependency:go-offline -B
 
 # Copy source code and build
 COPY src ./src
 # Force annotation processing by compiling first, then package
-RUN mvn clean compile -DskipTests && mvn package -DskipTests
+# Use -U to force update dependencies and ensure Lombok is downloaded
+RUN mvn clean compile -DskipTests -U && mvn package -DskipTests
 
 # Runtime stage
 FROM eclipse-temurin:17-jre-alpine
