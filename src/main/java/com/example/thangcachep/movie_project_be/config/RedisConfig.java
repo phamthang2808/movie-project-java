@@ -13,6 +13,7 @@ import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
@@ -21,6 +22,9 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+
+import io.lettuce.core.ClientOptions;
+import io.lettuce.core.SslOptions;
 
 /**
  * Redis Configuration
@@ -64,20 +68,52 @@ public class RedisConfig {
     /**
      * RedisConnectionFactory - tự tạo để tránh lỗi khi Redis không chạy
      * Chỉ tạo khi enabled=true và Redis server đang chạy
+     * Hỗ trợ TLS cho Upstash Redis
      */
     @Bean
     @ConditionalOnProperty(name = "spring.data.redis.enabled", havingValue = "true", matchIfMissing = true)
     public RedisConnectionFactory redisConnectionFactory(
             @Value("${spring.data.redis.host:localhost}") String host,
             @Value("${spring.data.redis.port:6379}") int port,
-            @Value("${spring.data.redis.password:}") String password) {
+            @Value("${spring.data.redis.password:}") String password,
+            @Value("${spring.data.redis.ssl:false}") boolean ssl) {
+
+        // Cleanup host: remove protocol nếu có (http://, https://, rediss://, redis://)
+        String cleanHost = host;
+        if (cleanHost != null) {
+            cleanHost = cleanHost.replaceFirst("^(rediss?|https?)://", "");
+            // Remove username:password@ nếu có
+            if (cleanHost.contains("@")) {
+                cleanHost = cleanHost.substring(cleanHost.indexOf("@") + 1);
+            }
+        }
+
         RedisStandaloneConfiguration config = new RedisStandaloneConfiguration();
-        config.setHostName(host);
+        config.setHostName(cleanHost);
         config.setPort(port);
         if (password != null && !password.isEmpty()) {
             config.setPassword(password);
         }
-        return new LettuceConnectionFactory(config);
+
+        // Cấu hình TLS/SSL cho Upstash Redis
+        LettuceClientConfiguration.LettuceClientConfigurationBuilder builder =
+                LettuceClientConfiguration.builder()
+                        .commandTimeout(Duration.ofSeconds(10)); // Timeout 10 giây
+
+        // Tự động bật SSL nếu host chứa "upstash.io" hoặc ssl=true
+        boolean useSsl = ssl || (cleanHost != null && cleanHost.contains("upstash.io"));
+        if (useSsl) {
+            builder.useSsl()
+                    .and()
+                    .clientOptions(ClientOptions.builder()
+                            .sslOptions(SslOptions.builder()
+                                    .build())
+                            .build());
+        }
+
+        LettuceConnectionFactory factory = new LettuceConnectionFactory(config, builder.build());
+        factory.setValidateConnection(true); // Validate connection khi tạo
+        return factory;
     }
 
     /**

@@ -50,10 +50,13 @@ spring:
     redis:
       # Mặc định KHÔNG dùng Redis (enabled=false)
       # Để BẬT Redis: đổi enabled thành true (dòng dưới)
-      enabled: ${REDIS_ENABLED:true} # Mặc định false - đổi thành true để bật Redis
-      host: ${REDIS_HOST:localhost}
+      enabled: ${REDIS_ENABLED:false} # Mặc định false - đổi thành true để bật Redis
+      host: ${REDIS_HOST:clear-phoenix-38580.upstash.io}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
+      password: ${REDIS_PASSWORD:AZa0AAIncDJkNTFjYWU2NGRlM2I0NmJmYjQ2ZjRmZmE4NTQzODBkMHAyMzg1ODA}
+#      host: ${REDIS_HOST:localhost}
+#      port: ${REDIS_PORT:6379}
+#      password: ${REDIS_PASSWORD:}
       timeout: 2000ms
       lettuce:
         pool:
