@@ -12,7 +12,8 @@ RUN mvn dependency:resolve -B && mvn dependency:go-offline -B
 COPY src ./src
 # Force annotation processing by compiling first, then package
 # Use -U to force update dependencies and ensure Lombok is downloaded
-RUN mvn clean compile -DskipTests -U && mvn package -DskipTests
+# Explicitly enable annotation processing
+RUN mvn clean compile -DskipTests -U -Dmaven.compiler.proc=full && mvn package -DskipTests
 
 # Runtime stage
 FROM eclipse-temurin:17-jre-alpine

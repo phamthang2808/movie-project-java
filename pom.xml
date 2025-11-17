@@ -215,6 +215,8 @@
                             <version>1.18.34</version>
                         </path>
                     </annotationProcessorPaths>
+                    <proc>full</proc>
+                    <generatedSourcesDirectory>${project.build.directory}/generated-sources/annotations</generatedSourcesDirectory>
                     <showWarnings>true</showWarnings>
                     <showDeprecation>true</showDeprecation>
                 </configuration>
