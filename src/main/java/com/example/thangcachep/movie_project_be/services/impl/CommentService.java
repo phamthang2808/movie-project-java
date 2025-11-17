@@ -55,7 +55,7 @@ public class CommentService {
                 .movie(movie)
                 .user(user)
                 .content(request.getContent().trim())
-                .isAnonymous(request.getIsAnonymous() != null && request.getIsAnonymous())
+                .isAnonymous(request.getIsAnonymous() != null ? request.getIsAnonymous() : false)
                 .likeCount(0)
                 .isActive(true)
                 .status(CommentEntity.CommentStatus.APPROVED) // Tự động approve, Admin có thể reject sau nếu vi phạm
@@ -91,7 +91,7 @@ public class CommentService {
         // Lấy tất cả comments gốc (không có parent), APPROVED và active
         List<CommentEntity> parentComments = commentRepository.findByMovieIdAndStatus(movieId, CommentEntity.CommentStatus.APPROVED)
                 .stream()
-                .filter(comment -> comment.getParent() == null && comment.getIsActive())
+                .filter(comment -> comment.getParent() == null && comment.getIsActive() != null && comment.getIsActive())
                 .collect(Collectors.toList());
 
         // Map sang CommentResponse và load replies, với thông tin isLiked
@@ -132,7 +132,7 @@ public class CommentService {
                 .updatedAt(comment.getUpdatedAt());
 
         // Nếu ẩn danh, set author và avatar = null
-        if (comment.getIsAnonymous() != null && comment.getIsAnonymous()) {
+        if (Boolean.TRUE.equals(comment.getIsAnonymous())) {
             builder.author(null);
             builder.avatar(null);
         } else {
