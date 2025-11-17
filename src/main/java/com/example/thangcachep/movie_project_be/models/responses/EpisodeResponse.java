@@ -1,13 +1,12 @@
 package com.example.thangcachep.movie_project_be.models.responses;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import lombok.*;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import java.time.LocalDateTime;
 
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder(builderClassName = "EpisodeResponseBuilder")

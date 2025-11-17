@@ -3,7 +3,10 @@ package com.example.thangcachep.movie_project_be.models.dto;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
-@Data
+import lombok.*;
+
+@Getter
+@Setter
 public class GoogleUserInfo {
     private String id;
     private String email;

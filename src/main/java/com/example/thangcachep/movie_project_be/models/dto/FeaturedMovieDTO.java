@@ -7,11 +7,10 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * DTO cho Featured Movie Response
- * Sử dụng MovieDTO riêng để tránh phụ thuộc vào MovieResponse của backend
- */
-@Data
+import lombok.*;
+
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor

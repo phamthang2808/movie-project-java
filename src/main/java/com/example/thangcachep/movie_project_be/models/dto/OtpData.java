@@ -3,10 +3,10 @@ package com.example.thangcachep.movie_project_be.models.dto;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
-/**
- * OtpData - DTO để lưu thông tin OTP
- */
+import lombok.*;
+
 @Getter
+@Setter
 @AllArgsConstructor
 public class OtpData {
     private final String otp;
