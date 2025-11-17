@@ -2,13 +2,18 @@ package com.example.thangcachep.movie_project_be.config;
 
 import java.time.Duration;
 
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
@@ -17,8 +22,16 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
+/**
+ * Redis Configuration
+ *
+ * Tự động detect Redis:
+ * - Nếu spring.data.redis.enabled=true VÀ Redis server đang chạy → dùng Redis cache
+ * - Nếu Redis server không chạy → CacheConfig sẽ load với NoOpCacheManager (fallback)
+ */
 @Configuration
 @EnableCaching
+@ConditionalOnProperty(name = "spring.data.redis.enabled", havingValue = "true", matchIfMissing = false)
 public class RedisConfig {
 
     /**
@@ -49,9 +62,30 @@ public class RedisConfig {
     }
 
     /**
-     * RedisTemplate để thao tác với Redis trực tiếp
+     * RedisConnectionFactory - tự tạo để tránh lỗi khi Redis không chạy
+     * Chỉ tạo khi enabled=true và Redis server đang chạy
      */
     @Bean
+    @ConditionalOnProperty(name = "spring.data.redis.enabled", havingValue = "true", matchIfMissing = true)
+    public RedisConnectionFactory redisConnectionFactory(
+            @Value("${spring.data.redis.host:localhost}") String host,
+            @Value("${spring.data.redis.port:6379}") int port,
+            @Value("${spring.data.redis.password:}") String password) {
+        RedisStandaloneConfiguration config = new RedisStandaloneConfiguration();
+        config.setHostName(host);
+        config.setPort(port);
+        if (password != null && !password.isEmpty()) {
+            config.setPassword(password);
+        }
+        return new LettuceConnectionFactory(config);
+    }
+
+    /**
+     * RedisTemplate để thao tác với Redis trực tiếp
+     * Chỉ tạo khi Redis được bật (spring.data.redis.enabled=true)
+     */
+    @Bean
+    @ConditionalOnProperty(name = "spring.data.redis.enabled", havingValue = "true", matchIfMissing = true)
     public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory connectionFactory) {
         RedisTemplate<String, Object> template = new RedisTemplate<>();
         template.setConnectionFactory(connectionFactory);
@@ -70,10 +104,12 @@ public class RedisConfig {
     }
 
     /**
-     * CacheManager để quản lý cache với Spring Cache abstraction
+     * CacheManager với Redis - chỉ tạo khi Redis được bật
      */
-    @Bean
-    public CacheManager cacheManager(RedisConnectionFactory connectionFactory) {
+    @Bean(name = "cacheManager")
+    @Primary
+    @ConditionalOnProperty(name = "spring.data.redis.enabled", havingValue = "true", matchIfMissing = true)
+    public CacheManager redisCacheManager(RedisConnectionFactory connectionFactory) {
         // ObjectMapper với JSR310Module cho cache
         ObjectMapper cacheObjectMapper = createObjectMapper();
         GenericJackson2JsonRedisSerializer jsonSerializer = new GenericJackson2JsonRedisSerializer(cacheObjectMapper);
@@ -129,5 +165,6 @@ public class RedisConfig {
                 .withCacheConfiguration("comments", commentsConfig)
                 .build();
     }
+
 }
 

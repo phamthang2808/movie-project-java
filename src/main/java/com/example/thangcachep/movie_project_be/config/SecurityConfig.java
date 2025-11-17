@@ -27,7 +27,11 @@ import lombok.RequiredArgsConstructor;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity
+@EnableMethodSecurity(
+        prePostEnabled = true,  // Cho phép sử dụng @PreAuthorize và @PostAuthorize
+        securedEnabled = true,  // Cho phép sử dụng @Secured
+        jsr250Enabled = true     // Cho phép sử dụng @RolesAllowed (JSR-250)
+)
 @RequiredArgsConstructor
 public class SecurityConfig {
 

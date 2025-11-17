@@ -5,6 +5,7 @@ import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -18,10 +19,16 @@ import com.example.thangcachep.movie_project_be.services.impl.CommentService;
 
 import lombok.RequiredArgsConstructor;
 
+/**
+ * Staff Comment Controller
+ * Quyền hạn: ADMIN hoặc STAFF có thể xem comments
+ * Sử dụng @PreAuthorize để kiểm tra quyền truy cập
+ */
 @RestController
 @RequestMapping("/api/v1/staff/comments")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
+@PreAuthorize("hasAnyRole('ADMIN', 'STAFF')") // ADMIN hoặc STAFF
 public class StaffCommentController {
 
     private final CommentService commentService;

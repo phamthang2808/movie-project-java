@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,11 +26,13 @@ import lombok.RequiredArgsConstructor;
 /**
  * Admin Movie Controller
  * Quyền hạn: Admin có đầy đủ quyền (CRUD + approve/reject)
+ * Sử dụng @PreAuthorize để kiểm tra quyền truy cập
  */
 @RestController
 @RequestMapping("/api/v1/admin/movies")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
+@PreAuthorize("hasRole('ADMIN')") // Tất cả các method trong controller này yêu cầu role ADMIN
 public class AdminMovieController {
 
     private final MovieService movieService;

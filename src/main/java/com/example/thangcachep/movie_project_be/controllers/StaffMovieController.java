@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,11 +25,13 @@ import lombok.RequiredArgsConstructor;
  * Staff Movie Controller
  * Quyền hạn: Staff chỉ có thể tạo và sửa phim, không thể xóa
  * Phim do Staff tạo sẽ có status PENDING (chờ Admin duyệt)
+ * Sử dụng @PreAuthorize để kiểm tra quyền truy cập
  */
 @RestController
 @RequestMapping("/api/v1/staff/movies")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
+@PreAuthorize("hasAnyRole('ADMIN', 'STAFF')") // ADMIN hoặc STAFF
 public class StaffMovieController {
 
     private final MovieService movieService;
@@ -38,6 +41,7 @@ public class StaffMovieController {
      * GET /api/v1/staff/movies
      */
     @GetMapping
+//    @PreAuthorize("hasAnyRole('STAFF')")
     public ResponseEntity<List<MovieResponse>> getAllMovies() {
         try {
             // Staff xem phim do mình tạo

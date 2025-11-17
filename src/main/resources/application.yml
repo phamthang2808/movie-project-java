@@ -48,6 +48,9 @@ spring:
       file-size-threshold: 10MB # Buffer size trước khi ghi vào disk
   data:
     redis:
+      # Mặc định KHÔNG dùng Redis (enabled=false)
+      # Để BẬT Redis: đổi enabled thành true (dòng dưới)
+      enabled: ${REDIS_ENABLED:true} # Mặc định false - đổi thành true để bật Redis
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}

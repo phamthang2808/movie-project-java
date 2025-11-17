@@ -5,6 +5,7 @@ import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -23,10 +24,16 @@ import com.example.thangcachep.movie_project_be.services.impl.CommentService;
 
 import lombok.RequiredArgsConstructor;
 
+/**
+ * Admin Comment Controller
+ * Quyền hạn: Chỉ ADMIN mới có quyền quản lý comments (duyệt, xóa)
+ * Sử dụng @PreAuthorize để kiểm tra quyền truy cập
+ */
 @RestController
 @RequestMapping("/api/v1/admin/comments")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
+@PreAuthorize("hasRole('ADMIN')") // Chỉ ADMIN
 public class AdminCommentController {
 
     private final CommentService commentService;
