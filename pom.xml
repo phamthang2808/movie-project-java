@@ -217,6 +217,10 @@
                     </annotationProcessorPaths>
                     <proc>full</proc>
                     <generatedSourcesDirectory>${project.build.directory}/generated-sources/annotations</generatedSourcesDirectory>
+                    <useIncrementalCompilation>false</useIncrementalCompilation>
+                    <fork>true</fork>
+                    <meminitial>128m</meminitial>
+                    <maxmem>2048m</maxmem>
                     <showWarnings>true</showWarnings>
                     <showDeprecation>true</showDeprecation>
                 </configuration>
