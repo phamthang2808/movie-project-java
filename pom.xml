@@ -68,6 +68,13 @@
             <version>1.18.34</version>
             <scope>provided</scope>
         </dependency>
+        <!-- Lombok mapstruct binding (optional but helps with annotation processing) -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok-mapstruct-binding</artifactId>
+            <version>0.2.0</version>
+            <scope>provided</scope>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -218,9 +225,6 @@
                     <proc>full</proc>
                     <generatedSourcesDirectory>${project.build.directory}/generated-sources/annotations</generatedSourcesDirectory>
                     <useIncrementalCompilation>false</useIncrementalCompilation>
-                    <fork>true</fork>
-                    <meminitial>128m</meminitial>
-                    <maxmem>2048m</maxmem>
                     <showWarnings>true</showWarnings>
                     <showDeprecation>true</showDeprecation>
                 </configuration>

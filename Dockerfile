@@ -13,11 +13,11 @@ COPY src ./src
 # Force annotation processing by compiling first, then package
 # Use -U to force update dependencies and ensure Lombok is downloaded
 # Explicitly enable annotation processing and ensure Lombok is processed
-ENV MAVEN_OPTS="-Xmx2048m"
+ENV MAVEN_OPTS="-Xmx2048m -Djdk.module.illegalAccess=permit"
 # Verify Lombok is downloaded
 RUN mvn dependency:tree | grep lombok || echo "Lombok not found in dependencies"
-# Clean and compile with annotation processing
-RUN mvn clean compile -DskipTests -U -e
+# Clean and compile with annotation processing - use explicit compiler args
+RUN mvn clean compile -DskipTests -U -e -Dmaven.compiler.fork=true -Dmaven.compiler.meminitial=128m -Dmaven.compiler.maxmem=2048m
 # Package
 RUN mvn package -DskipTests
 
