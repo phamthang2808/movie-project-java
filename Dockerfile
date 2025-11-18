@@ -1,45 +1,27 @@
-# Build stage
-FROM maven:3.9-eclipse-temurin-17 AS build
+# Build stage - Linux AMD64 platform
+FROM --platform=linux/amd64 maven:3.9-eclipse-temurin-17 AS build
 WORKDIR /app
 
-# Copy pom.xml và download dependencies trước
+# Copy pom.xml và download dependencies
 COPY pom.xml .
-RUN mvn dependency:go-offline -B
+RUN mvn dependency:go-offline -B -U
 
 # Copy source code
 COPY src ./src
 
-# Build - quan trọng: phải clean trước
-RUN mvn clean compile -B
-RUN mvn package -DskipTests -B
+# Build với force update và verbose để debug
+RUN mvn clean package -DskipTests -B -U --no-transfer-progress
 
 # Runtime stage
-FROM eclipse-temurin:17-jre-alpine
+FROM --platform=linux/amd64 eclipse-temurin:17-jre-alpine
 WORKDIR /app
 
-# Copy jar từ build stage
-COPY --from=build /app/target/*.jar app.jar
+# Copy jar file
+COPY --from=build /app/target/movie-project-be-0.0.1-SNAPSHOT.jar app.jar
 
 # Expose port
 EXPOSE 8080
 
-# Run với PORT từ environment variable
-ENTRYPOINT ["sh", "-c", "java -jar app.jar --server.port=${PORT:-8080}"]
-```
-
-## **QUAN TRỌNG: Sửa lỗi tên file**
-
-Bạn cần đổi tên file:
-- `PaypalController.java` → `PayPalController.java`
-- `PaypalConfig.java` → `PayPalConfig.java`
-
-Hoặc đổi tên class trong file cho khớp với tên file hiện tại.
-
-## **Kiểm tra lombok.config** (nếu có):
-
-Nếu bạn có file `lombok.config` trong root project, hãy đảm bảo nó không block annotation processing:
-```
-# lombok.config
-config.stopBubbling = true
-lombok.addLombokGeneratedAnnotation = true
-lombok.anyConstructor.addConstructorProperties = true
+# QUAN TRỌNG: Dùng PORT (không phải SERVER_PORT)
+# Thêm memory limits cho free tier
+ENTRYPOINT ["sh", "-c", "java -Xmx512m -Xms256m -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -jar app.jar"]
