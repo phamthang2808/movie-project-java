@@ -10,20 +10,14 @@ RUN mvn dependency:resolve -B && mvn dependency:go-offline -B
 
 # Copy source code and build
 COPY src ./src
-# BREAKTHROUGH APPROACH: Use delombok to generate code BEFORE compile
-# This ensures getter/setter are generated as actual code before compilation
+# SIMPLE & EFFECTIVE: Let Maven handle annotation processing correctly
+# The key is ensuring Lombok is downloaded and annotation processing is enabled
 ENV MAVEN_OPTS="-Xmx2048m"
-# Step 1: Generate sources using delombok (runs in generate-sources phase)
-# This creates actual getter/setter code in target/delombok (with all Lombok annotations expanded)
-RUN mvn generate-sources -DskipTests
-# Step 2: Replace src/main/java with delombok output (now has actual getter/setter code, no Lombok annotations)
-# Keep resources directory intact
-RUN rm -rf src/main/java && mkdir -p src/main/java && cp -r target/delombok/* src/main/java/ && \
-    find src/main/java -name "*.java" -type f | head -5 || echo "Delombok files copied"
-# Step 3: Clean and compile (now compiling actual Java code with getter/setter, no annotation processing needed)
-RUN mvn clean compile -DskipTests -U
-# Step 4: Package
-RUN mvn package -DskipTests
+# Verify Lombok is available in classpath
+RUN mvn dependency:tree -Dincludes=org.projectlombok:lombok | head -20 || echo "Lombok check..."
+# Clean and build in one go (ensures no delombok interference)
+# The maven-compiler-plugin will process Lombok annotations correctly
+RUN mvn clean package -DskipTests -U
 
 # Runtime stage
 FROM eclipse-temurin:17-jre-alpine

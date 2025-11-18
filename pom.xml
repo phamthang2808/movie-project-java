@@ -204,8 +204,7 @@
 
     <build>
         <plugins>
-            <!-- Lombok Delombok Plugin - Generate code BEFORE compile -->
-            <!-- This generates actual getter/setter code, solving Docker build issues -->
+            <!-- Disable delombok if inherited from parent -->
             <plugin>
                 <groupId>org.projectlombok</groupId>
                 <artifactId>lombok-maven-plugin</artifactId>
@@ -213,18 +212,7 @@
                 <executions>
                     <execution>
                         <id>delombok</id>
-                        <phase>generate-sources</phase>
-                        <goals>
-                            <goal>delombok</goal>
-                        </goals>
-                        <configuration>
-                            <addOutputDirectory>false</addOutputDirectory>
-                            <sourceDirectory>src/main/java</sourceDirectory>
-                            <outputDirectory>${project.build.directory}/delombok</outputDirectory>
-                            <formatPreferences>
-                                <javaLangAsFQN>skip</javaLangAsFQN>
-                            </formatPreferences>
-                        </configuration>
+                        <phase>none</phase>
                     </execution>
                 </executions>
             </plugin>
@@ -239,10 +227,21 @@
                     <compilerArgs>
                         <arg>-parameters</arg>
                     </compilerArgs>
-                    <!-- After delombok replaces src/main/java, we don't need annotation processing anymore -->
-                    <!-- The code is already generated as actual Java code -->
-                    <proc>none</proc>
+                    <!-- CRITICAL: Explicitly configure Lombok as annotation processor -->
+                    <!-- This is what makes Lombok work in Docker build (same as IntelliJ plugin) -->
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>1.18.34</version>
+                        </path>
+                    </annotationProcessorPaths>
+                    <!-- CRITICAL: Enable annotation processing (full = process all annotations) -->
+                    <proc>full</proc>
+                    <!-- CRITICAL: Disable incremental compilation to force full processing -->
                     <useIncrementalCompilation>false</useIncrementalCompilation>
+                    <!-- CRITICAL: Show compiler output for debugging -->
+                    <verbose>true</verbose>
                     <showWarnings>true</showWarnings>
                     <showDeprecation>true</showDeprecation>
                 </configuration>
