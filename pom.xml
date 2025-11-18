@@ -204,18 +204,6 @@
 
     <build>
         <plugins>
-            <!-- Disable delombok if inherited from parent -->
-            <plugin>
-                <groupId>org.projectlombok</groupId>
-                <artifactId>lombok-maven-plugin</artifactId>
-                <version>1.18.20.0</version>
-                <executions>
-                    <execution>
-                        <id>delombok</id>
-                        <phase>none</phase>
-                    </execution>
-                </executions>
-            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -224,28 +212,22 @@
                     <source>17</source>
                     <target>17</target>
                     <encoding>UTF-8</encoding>
-                    <compilerArgs>
-                        <arg>-parameters</arg>
-                    </compilerArgs>
-                    <!-- CRITICAL: Explicitly configure Lombok as annotation processor -->
-                    <!-- This is what makes Lombok work in Docker build (same as IntelliJ plugin) -->
                     <annotationProcessorPaths>
                         <path>
                             <groupId>org.projectlombok</groupId>
                             <artifactId>lombok</artifactId>
                             <version>1.18.34</version>
                         </path>
+                        <!-- Nếu có MapStruct thì thêm binding -->
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok-mapstruct-binding</artifactId>
+                            <version>0.2.0</version>
+                        </path>
                     </annotationProcessorPaths>
-                    <!-- CRITICAL: Enable annotation processing (full = process all annotations) -->
-                    <proc>full</proc>
-                    <!-- CRITICAL: Disable incremental compilation to force full processing -->
-                    <useIncrementalCompilation>false</useIncrementalCompilation>
-                    <!-- CRITICAL: Show compiler output for debugging -->
-                    <verbose>true</verbose>
-                    <showWarnings>true</showWarnings>
-                    <showDeprecation>true</showDeprecation>
                 </configuration>
             </plugin>
+
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
