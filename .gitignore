@@ -39,6 +39,6 @@ build/
 .env.local
 .env.production
 render.env
-*.yml
+
 *.yaml
 !application.yml.example
