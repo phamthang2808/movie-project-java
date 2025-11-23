@@ -3,9 +3,11 @@ package com.example.thangcachep.movie_project_be.config;
 import java.time.Duration;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.cache.support.NoOpCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -71,7 +73,7 @@ public class RedisConfig {
      * Hỗ trợ TLS cho Upstash Redis
      */
     @Bean
-    @ConditionalOnProperty(name = "spring.data.redis.enabled", havingValue = "true", matchIfMissing = true)
+    @ConditionalOnProperty(name = "spring.data.redis.enabled", havingValue = "true", matchIfMissing = false)
     public RedisConnectionFactory redisConnectionFactory(
             @Value("${spring.data.redis.host:localhost}") String host,
             @Value("${spring.data.redis.port:6379}") int port,
@@ -121,7 +123,7 @@ public class RedisConfig {
      * Chỉ tạo khi Redis được bật (spring.data.redis.enabled=true)
      */
     @Bean
-    @ConditionalOnProperty(name = "spring.data.redis.enabled", havingValue = "true", matchIfMissing = true)
+    @ConditionalOnProperty(name = "spring.data.redis.enabled", havingValue = "true", matchIfMissing = false)
     public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory connectionFactory) {
         RedisTemplate<String, Object> template = new RedisTemplate<>();
         template.setConnectionFactory(connectionFactory);
@@ -144,7 +146,7 @@ public class RedisConfig {
      */
     @Bean(name = "cacheManager")
     @Primary
-    @ConditionalOnProperty(name = "spring.data.redis.enabled", havingValue = "true", matchIfMissing = true)
+    @ConditionalOnProperty(name = "spring.data.redis.enabled", havingValue = "true", matchIfMissing = false)
     public CacheManager redisCacheManager(RedisConnectionFactory connectionFactory) {
         // ObjectMapper với JSR310Module cho cache
         ObjectMapper cacheObjectMapper = createObjectMapper();
@@ -202,5 +204,16 @@ public class RedisConfig {
                 .build();
     }
 
+    /**
+     * Fallback CacheManager khi Redis bị tắt hoặc không có RedisConnectionFactory.
+     * Sử dụng NoOpCacheManager để ứng dụng vẫn hoạt động (không cache).
+     */
+    @Bean(name = "cacheManager")
+    @Primary
+    @ConditionalOnMissingBean(RedisConnectionFactory.class)
+    @ConditionalOnProperty(name = "spring.data.redis.enabled", havingValue = "false", matchIfMissing = true)
+    public CacheManager fallbackCacheManager() {
+        return new NoOpCacheManager();
+    }
 }
 

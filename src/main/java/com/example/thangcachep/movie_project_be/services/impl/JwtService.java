@@ -18,7 +18,7 @@ import java.util.function.Function;
 @Service
 public class JwtService {
     
-    @Value("${jwt.secret:your-secret-key-must-be-at-least-256-bits-long-for-security}")
+    @Value("${jwt.secretKey:your-secret-key-must-be-at-least-256-bits-long-for-security}")
     private String secret;
     
     @Value("${jwt.expiration:86400000}") // 24 hours

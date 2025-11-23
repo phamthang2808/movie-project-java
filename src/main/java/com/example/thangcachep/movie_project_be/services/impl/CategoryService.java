@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,13 +21,18 @@ public class CategoryService {
     private final CategoryRepository categoryRepository;
 
     /**
-     * Lấy tất cả categories
+     * Lấy tất cả categories đang active
      * Cache: 6 giờ (categories ít thay đổi)
+     * Tạm thời tắt cache để debug: comment @Cacheable
      */
-    @Cacheable(value = "categories", key = "'all'")
+    // @Cacheable(value = "categories", key = "'all'") // Tạm thời tắt cache
     public List<CategoryResponse> getAllCategories() {
+        // Lấy tất cả categories và filter active ở service layer
+        // (Cách này đảm bảo tương thích với cache và hoạt động như trước)
         List<CategoryEntity> categories = categoryRepository.findAll();
         return categories.stream()
+                .filter(cat -> cat.getIsActive() != null && cat.getIsActive()) // Chỉ lấy active
+                .sorted((a, b) -> a.getName().compareToIgnoreCase(b.getName())) // Sắp xếp theo tên
                 .map(this::mapToCategoryResponse)
                 .collect(Collectors.toList());
     }

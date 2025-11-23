@@ -3,7 +3,6 @@ package com.example.thangcachep.movie_project_be.controllers;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.example.thangcachep.movie_project_be.services.impl.BucketService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -22,6 +21,7 @@ import com.example.thangcachep.movie_project_be.entities.UserEntity;
 import com.example.thangcachep.movie_project_be.models.request.ChangePasswordRequest;
 import com.example.thangcachep.movie_project_be.models.responses.UserResponse;
 import com.example.thangcachep.movie_project_be.repositories.UserRepository;
+import com.example.thangcachep.movie_project_be.services.impl.AzureBlobStorageService;
 import com.example.thangcachep.movie_project_be.services.impl.UserService;
 
 import jakarta.validation.Valid;
@@ -35,7 +35,7 @@ public class UserController {
 
     private final UserService userService;
     private final UserRepository userRepository;
-    private final BucketService bucketService;
+    private final AzureBlobStorageService azureBlobStorageService;
 
     @GetMapping("/profile")
     public ResponseEntity<UserResponse> getProfile() {
@@ -80,8 +80,8 @@ public class UserController {
                         .body(Map.of("success", false, "message", "Ảnh không được vượt quá 5MB"));
             }
 
-            // Upload file lên AWS S3
-            String avatarUrl = bucketService.uploadFile(file);
+            // Upload file lên Azure Blob Storage
+            String avatarUrl = azureBlobStorageService.uploadFile(file);
 
             // Update user avatar
             user.setAvatarUrl(avatarUrl);
