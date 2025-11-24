@@ -39,6 +39,12 @@ build/
 .env.local
 .env.production
 render.env
+azure.env
 
+# Ignore YAML config files with sensitive data
 *.yaml
-!application.yml.example
+*.yml
+# But allow example files
+!**/application.yml.example
+!**/*.example.yml
+!**/*.example.yaml
