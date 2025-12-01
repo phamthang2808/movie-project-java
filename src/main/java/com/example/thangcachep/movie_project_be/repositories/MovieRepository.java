@@ -44,8 +44,7 @@ public interface MovieRepository extends JpaRepository<MovieEntity, Long> {
 
     @Query("SELECT m FROM MovieEntity m WHERE m.isActive = true " +
             "AND m.status != 'PENDING' AND m.status != 'REJECTED' " +
-            "AND (LOWER(m.title) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(m.description) LIKE LOWER(CONCAT('%', :keyword, '%')))")
+            "AND LOWER(m.title) LIKE LOWER(CONCAT('%', :keyword, '%'))")
     Page<MovieEntity> searchMovies(String keyword, Pageable pageable);
 
     @Query("SELECT m FROM MovieEntity m JOIN m.categories c WHERE c.id = :categoryId AND m.isActive = true " +

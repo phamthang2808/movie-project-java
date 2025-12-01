@@ -6,10 +6,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 
-import com.example.thangcachep.movie_project_be.config.BankAccountProperties;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.example.thangcachep.movie_project_be.config.BankAccountProperties;
 import com.example.thangcachep.movie_project_be.entities.TransactionEntity;
 import com.example.thangcachep.movie_project_be.entities.UserEntity;
 import com.example.thangcachep.movie_project_be.repositories.TransactionRepository;
@@ -40,6 +41,7 @@ public class BankTransferService {
      * @return Transaction code (mã giao dịch) và thông tin tài khoản
      */
     @Transactional
+    @CacheEvict(value = "statistics", allEntries = true)
     public Map<String, Object> createBankTransferTransaction(Long userId, Double amount) {
         log.info("📝 Tạo giao dịch chuyển khoản - UserId: {}, Amount: {} VND", userId, amount);
 
@@ -117,6 +119,7 @@ public class BankTransferService {
      * @return Kết quả verify
      */
     @Transactional
+    @CacheEvict(value = "statistics", allEntries = true)
     public Map<String, Object> verifyBankTransfer(String transactionCode, String verifiedBy) {
         log.info("🔍 Verify chuyển khoản - Code: {}, VerifiedBy: {}", transactionCode, verifiedBy);
 

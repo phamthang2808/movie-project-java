@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.TimeZone;
 
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -184,6 +185,7 @@ public class VnpayService {
     }
 
     @Transactional
+    @CacheEvict(value = "statistics", allEntries = true)
     public ResponseEntity<?> verifyAndProcess(Map<String, String> params, boolean isIpn, Long userId) {
         try {
             // 1) Lấy secure hash và tạo bản sao fields để tính lại hash

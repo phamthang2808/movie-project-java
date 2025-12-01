@@ -354,7 +354,7 @@ public class MovieService {
      * Clear cache khi tạo mới
      */
     @Transactional
-    @CacheEvict(value = {"movies", "topMovies"}, allEntries = true)
+    @CacheEvict(value = {"movies", "topMovies", "statistics"}, allEntries = true)
     public MovieResponse createMovie(MovieRequest request) {
         MovieEntity movie = new MovieEntity();
 
@@ -431,7 +431,7 @@ public class MovieService {
      * Update movie - Clear cache khi update
      */
     @Transactional
-    @CacheEvict(value = {"movies", "topMovies"}, allEntries = true)
+    @CacheEvict(value = {"movies", "topMovies", "statistics"}, allEntries = true)
     public MovieResponse updateMovie(Long id, Map<String, Object> updates) throws DataNotFoundException {
         MovieEntity movie = movieRepository.findById(id)
                 .orElseThrow(() -> new DataNotFoundException("Không tìm thấy phim với ID: " + id));
@@ -544,7 +544,7 @@ public class MovieService {
      * Delete movie - Clear cache khi delete
      */
     @Transactional
-    @CacheEvict(value = {"movies", "topMovies"}, allEntries = true)
+    @CacheEvict(value = {"movies", "topMovies", "statistics"}, allEntries = true)
     public void deleteMovie(Long id) throws DataNotFoundException {
         MovieEntity movie = movieRepository.findById(id)
                 .orElseThrow(() -> new DataNotFoundException("Không tìm thấy phim với ID: " + id));
@@ -959,7 +959,7 @@ public class MovieService {
      * Clear cache khi tạo mới
      */
     @Transactional
-    @CacheEvict(value = {"movies", "topMovies"}, allEntries = true)
+    @CacheEvict(value = {"movies", "topMovies", "statistics"}, allEntries = true)
     public MovieResponse createMovieForStaff(MovieRequest request) {
         UserEntity currentUser = getCurrentUser();
         if (currentUser == null) {
@@ -983,7 +983,7 @@ public class MovieService {
      * Clear cache khi tạo mới
      */
     @Transactional
-    @CacheEvict(value = {"movies", "topMovies"}, allEntries = true)
+    @CacheEvict(value = {"movies", "topMovies", "statistics"}, allEntries = true)
     public MovieResponse createMovieForAdmin(MovieRequest request) {
         UserEntity currentUser = getCurrentUser();
         if (currentUser == null) {
@@ -1071,7 +1071,7 @@ public class MovieService {
      * Clear cache khi update
      */
     @Transactional
-    @CacheEvict(value = {"movies", "topMovies"}, allEntries = true)
+    @CacheEvict(value = {"movies", "topMovies", "statistics"}, allEntries = true)
     public MovieResponse updateMovieForStaff(Long id, Map<String, Object> updates) throws DataNotFoundException {
         UserEntity currentUser = getCurrentUser();
         if (currentUser == null) {

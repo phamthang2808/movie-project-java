@@ -194,6 +194,13 @@ public class RedisConfig {
                 .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(jsonSerializer))
                 .disableCachingNullValues();
 
+        // Statistics cache: 5 phút (thống kê thay đổi thường xuyên)
+        RedisCacheConfiguration statisticsConfig = RedisCacheConfiguration.defaultCacheConfig()
+                .entryTtl(Duration.ofMinutes(5))
+                .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()))
+                .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(jsonSerializer))
+                .disableCachingNullValues();
+
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(defaultConfig)
                 .withCacheConfiguration("movies", moviesConfig)
@@ -201,6 +208,7 @@ public class RedisConfig {
                 .withCacheConfiguration("topMovies", topMoviesConfig)
                 .withCacheConfiguration("users", usersConfig)
                 .withCacheConfiguration("comments", commentsConfig)
+                .withCacheConfiguration("statistics", statisticsConfig)
                 .build();
     }
 

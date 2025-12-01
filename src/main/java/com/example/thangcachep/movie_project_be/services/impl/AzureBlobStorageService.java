@@ -45,7 +45,7 @@ public class AzureBlobStorageService {
         String originalFilename = file.getOriginalFilename();
         String fileExtension = "";
         if (originalFilename != null && originalFilename.contains(".")) {
-            fileExtension = originalFilename.substring(originalFilename.lastIndexOf("."));
+            fileExtension = originalFilename.substring(originalFilename.lastIndexOf(".")).toLowerCase();
         }
         String uniqueFileName = UUID.randomUUID().toString() + fileExtension;
 
@@ -59,17 +59,118 @@ public class AzureBlobStorageService {
         // Azure Blob Storage metadata không cho phép dấu gạch ngang trong key
         blobClient.upload(file.getInputStream(), file.getSize(), true);
 
-        // 5. Set content type sau khi upload (dùng BlobHttpHeaders, không dùng metadata)
-        if (file.getContentType() != null) {
-            com.azure.storage.blob.models.BlobHttpHeaders headers = new com.azure.storage.blob.models.BlobHttpHeaders();
-            headers.setContentType(file.getContentType());
-            blobClient.setHttpHeaders(headers);
+        // 5. Set headers sau khi upload (dùng BlobHttpHeaders, không dùng metadata)
+        com.azure.storage.blob.models.BlobHttpHeaders headers = new com.azure.storage.blob.models.BlobHttpHeaders();
+
+        // 5.1. Detect và set Content-Type đúng cho video files
+        String contentType = file.getContentType();
+        if (contentType == null || contentType.equals("application/octet-stream")) {
+            // Nếu không có Content-Type hoặc là octet-stream, detect từ extension
+            contentType = detectContentType(fileExtension, originalFilename);
         }
+        headers.setContentType(contentType);
+
+        // 5.2. Set headers cho video streaming (quan trọng cho video lớn)
+        if (isVideoFile(fileExtension)) {
+            // Accept-Ranges: bytes - Cho phép Range Request (cần thiết cho video streaming)
+            // Cache-Control: public, max-age=31536000 - Cache 1 năm cho video
+            headers.setCacheControl("public, max-age=31536000, immutable");
+        } else if (isImageFile(fileExtension)) {
+            // Cache headers cho ảnh
+            headers.setCacheControl("public, max-age=31536000, immutable");
+        } else {
+            // Cache headers cho các file khác
+            headers.setCacheControl("public, max-age=86400");
+        }
+
+        blobClient.setHttpHeaders(headers);
 
         // 6. Trả về public URL
         String fileUrl = publicUrl + "/" + uniqueFileName;
-        log.info("✅ Đã upload file: {} -> {}", uniqueFileName, fileUrl);
+        log.info("✅ Đã upload file: {} -> {} (Content-Type: {})", uniqueFileName, fileUrl, contentType);
         return fileUrl;
+    }
+
+    /**
+     * Detect Content-Type từ file extension
+     */
+    private String detectContentType(String fileExtension, String originalFilename) {
+        if (fileExtension == null || fileExtension.isEmpty()) {
+            return "application/octet-stream";
+        }
+
+        switch (fileExtension.toLowerCase()) {
+            // Video formats
+            case ".mp4":
+                return "video/mp4";
+            case ".webm":
+                return "video/webm";
+            case ".mkv":
+                return "video/x-matroska";
+            case ".avi":
+                return "video/x-msvideo";
+            case ".mov":
+                return "video/quicktime";
+            case ".flv":
+                return "video/x-flv";
+            case ".m3u8":
+                return "application/vnd.apple.mpegurl";
+            case ".ts":
+                return "video/mp2t";
+
+            // Image formats
+            case ".jpg":
+            case ".jpeg":
+                return "image/jpeg";
+            case ".png":
+                return "image/png";
+            case ".gif":
+                return "image/gif";
+            case ".webp":
+                return "image/webp";
+            case ".svg":
+                return "image/svg+xml";
+
+            // Document formats
+            case ".pdf":
+                return "application/pdf";
+            case ".doc":
+                return "application/msword";
+            case ".docx":
+                return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+            case ".xls":
+                return "application/vnd.ms-excel";
+            case ".xlsx":
+                return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+            default:
+                return "application/octet-stream";
+        }
+    }
+
+    /**
+     * Kiểm tra xem file có phải là video không
+     */
+    private boolean isVideoFile(String fileExtension) {
+        if (fileExtension == null || fileExtension.isEmpty()) {
+            return false;
+        }
+        String ext = fileExtension.toLowerCase();
+        return ext.equals(".mp4") || ext.equals(".webm") || ext.equals(".mkv")
+                || ext.equals(".avi") || ext.equals(".mov") || ext.equals(".flv")
+                || ext.equals(".m3u8") || ext.equals(".ts");
+    }
+
+    /**
+     * Kiểm tra xem file có phải là ảnh không
+     */
+    private boolean isImageFile(String fileExtension) {
+        if (fileExtension == null || fileExtension.isEmpty()) {
+            return false;
+        }
+        String ext = fileExtension.toLowerCase();
+        return ext.equals(".jpg") || ext.equals(".jpeg") || ext.equals(".png")
+                || ext.equals(".gif") || ext.equals(".webp") || ext.equals(".svg");
     }
 
     /**

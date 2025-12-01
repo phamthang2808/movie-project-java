@@ -1,22 +1,31 @@
 package com.example.thangcachep.movie_project_be.services.impl;
 
-import com.example.thangcachep.movie_project_be.entities.CategoryEntity;
-import com.example.thangcachep.movie_project_be.entities.MovieEntity;
-import com.example.thangcachep.movie_project_be.models.request.ChatRequest;
-import com.example.thangcachep.movie_project_be.repositories.CategoryRepository;
-import com.example.thangcachep.movie_project_be.repositories.MovieRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.ai.chat.model.ChatModel;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
-import java.util.*;
-import java.util.stream.Collectors;
+import com.example.thangcachep.movie_project_be.entities.CategoryEntity;
+import com.example.thangcachep.movie_project_be.entities.MovieEntity;
+import com.example.thangcachep.movie_project_be.models.request.ChatRequest;
+import com.example.thangcachep.movie_project_be.repositories.CategoryRepository;
+import com.example.thangcachep.movie_project_be.repositories.MovieRepository;
+
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -29,24 +38,41 @@ public class AIMovieAdvisorService {
 
     public String chat(ChatRequest chatRequest) {
         String userMessage = chatRequest.message().trim();
+        List<Message> messages = new ArrayList<>();
 
-        // Tìm phim liên quan bằng keyword search
-        List<MovieEntity> relevantMovies = findRelevantMovies(userMessage);
+        // 1. Xử lý System Prompt
+        String systemPrompt;
+        if (chatRequest.systemPrompt() != null && !chatRequest.systemPrompt().trim().isEmpty()) {
+            // Sử dụng system prompt từ frontend
+            systemPrompt = chatRequest.systemPrompt();
+        } else {
+            // Tự động tìm phim và tạo system prompt (fallback)
+            List<MovieEntity> relevantMovies = findRelevantMovies(userMessage);
+            String context = buildMovieContext(relevantMovies, userMessage);
+            systemPrompt = buildSystemPrompt(context);
+        }
+        messages.add(new SystemMessage(systemPrompt));
 
-        // Tạo context từ dữ liệu phim
-        String context = buildMovieContext(relevantMovies, userMessage);
+        // 2. Xử lý Conversation History (nếu có)
+        if (chatRequest.conversationHistory() != null && !chatRequest.conversationHistory().isEmpty()) {
+            for (Map<String, String> historyItem : chatRequest.conversationHistory()) {
+                String role = historyItem.get("role");
+                String content = historyItem.get("content");
+                if (role != null && content != null) {
+                    if ("user".equalsIgnoreCase(role)) {
+                        messages.add(new UserMessage(content));
+                    } else if ("assistant".equalsIgnoreCase(role)) {
+                        messages.add(new AssistantMessage(content));
+                    }
+                }
+            }
+        }
 
-        // Tạo system prompt với context
-        String systemPrompt = buildSystemPrompt(context);
+        // 3. Thêm user message hiện tại
+        messages.add(new UserMessage(userMessage));
 
-        // Gọi AI với context
-        Prompt prompt = new Prompt(
-                Arrays.asList(
-                        new SystemMessage(systemPrompt),
-                        new UserMessage(userMessage)
-                )
-        );
-
+        // 4. Gọi AI với tất cả messages
+        Prompt prompt = new Prompt(messages);
         return chatModel.call(prompt).getResult().getOutput().getContent();
     }
 

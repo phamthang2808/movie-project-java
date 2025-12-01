@@ -34,7 +34,7 @@ public class CommentService {
      * Tạo comment mới
      */
     @Transactional
-    @CacheEvict(value = {"comments", "movies"}, allEntries = true)
+    @CacheEvict(value = {"comments", "movies", "statistics"}, allEntries = true)
     public CommentResponse createComment(Long movieId, CommentRequest request, UserEntity user) {
         // Kiểm tra movie có tồn tại không
         MovieEntity movie = movieRepository.findById(movieId)
@@ -404,7 +404,7 @@ public class CommentService {
      * @return CommentResponse đã được duyệt
      */
     @Transactional
-    @CacheEvict(value = {"comments", "movies"}, allEntries = true)
+    @CacheEvict(value = {"comments", "movies", "statistics"}, allEntries = true)
     public CommentResponse approveComment(Long commentId, UserEntity admin) throws DataNotFoundException {
         CommentEntity comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new DataNotFoundException("Không tìm thấy comment với ID: " + commentId));
@@ -432,7 +432,7 @@ public class CommentService {
      * @return CommentResponse đã bị từ chối
      */
     @Transactional
-    @CacheEvict(value = {"comments", "movies"}, allEntries = true)
+    @CacheEvict(value = {"comments", "movies", "statistics"}, allEntries = true)
     public CommentResponse rejectComment(Long commentId, UserEntity admin) throws DataNotFoundException {
         CommentEntity comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new DataNotFoundException("Không tìm thấy comment với ID: " + commentId));
@@ -458,7 +458,7 @@ public class CommentService {
      * @param commentId ID của comment
      */
     @Transactional
-    @CacheEvict(value = {"comments", "movies"}, allEntries = true)
+    @CacheEvict(value = {"comments", "movies", "statistics"}, allEntries = true)
     public void deleteComment(Long commentId) throws DataNotFoundException {
         // Kiểm tra comment có tồn tại không
         if (!commentRepository.existsById(commentId)) {
