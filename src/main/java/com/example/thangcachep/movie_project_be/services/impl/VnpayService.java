@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.example.thangcachep.movie_project_be.config.VnPayConfig;
 import com.example.thangcachep.movie_project_be.entities.TransactionEntity;
 import com.example.thangcachep.movie_project_be.entities.UserEntity;
+import com.example.thangcachep.movie_project_be.exceptions.InvalidParamException;
 import com.example.thangcachep.movie_project_be.models.request.VnpayRequest;
 import com.example.thangcachep.movie_project_be.models.responses.VnpayPaymentResponse;
 import com.example.thangcachep.movie_project_be.repositories.TransactionRepository;
@@ -55,7 +56,7 @@ public class VnpayService {
             log.debug("💰 Số tiền sau khi convert: {} (x100)", amount);
         } catch (NumberFormatException e) {
             log.error("❌ Số tiền không hợp lệ: {}", paymentRequest.getAmount());
-            throw new IllegalArgumentException("Số tiền không hợp lệ");
+            throw new InvalidParamException("Số tiền không hợp lệ");
         }
 
         // Sử dụng bankCode từ request, mặc định là BIDV nếu không có

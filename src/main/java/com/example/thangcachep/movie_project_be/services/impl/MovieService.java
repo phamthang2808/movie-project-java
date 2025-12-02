@@ -25,7 +25,11 @@ import com.example.thangcachep.movie_project_be.entities.MovieEntity;
 import com.example.thangcachep.movie_project_be.entities.UserEntity;
 import com.example.thangcachep.movie_project_be.entities.WatchHistoryEntity;
 import com.example.thangcachep.movie_project_be.entities.WatchlistEntity;
+import com.example.thangcachep.movie_project_be.exceptions.ConflictException;
 import com.example.thangcachep.movie_project_be.exceptions.DataNotFoundException;
+import com.example.thangcachep.movie_project_be.exceptions.InvalidParamException;
+import com.example.thangcachep.movie_project_be.exceptions.PermissionDenyException;
+import com.example.thangcachep.movie_project_be.exceptions.UnauthorizedException;
 import com.example.thangcachep.movie_project_be.models.request.MovieRequest;
 import com.example.thangcachep.movie_project_be.models.responses.EpisodeResponse;
 import com.example.thangcachep.movie_project_be.models.responses.MovieResponse;
@@ -671,7 +675,7 @@ public class MovieService {
 
         // Kiểm tra đã có trong favorites chưa
         if (favoriteRepository.existsByMovieIdAndUserId(movieId, userId)) {
-            throw new IllegalArgumentException("Phim đã có trong danh sách yêu thích");
+            throw new ConflictException("Phim đã có trong danh sách yêu thích");
         }
 
         // Tạo favorite entity
@@ -740,7 +744,7 @@ public class MovieService {
 
         // Kiểm tra đã có trong watchlist chưa
         if (watchlistRepository.existsByMovieIdAndUserId(movieId, userId)) {
-            throw new IllegalArgumentException("Phim đã có trong danh sách xem");
+            throw new ConflictException("Phim đã có trong danh sách xem");
         }
 
         // Tạo watchlist entity
@@ -963,7 +967,7 @@ public class MovieService {
     public MovieResponse createMovieForStaff(MovieRequest request) {
         UserEntity currentUser = getCurrentUser();
         if (currentUser == null) {
-            throw new RuntimeException("User chưa đăng nhập");
+            throw new UnauthorizedException("User chưa đăng nhập");
         }
 
         MovieEntity movie = new MovieEntity();
@@ -987,7 +991,7 @@ public class MovieService {
     public MovieResponse createMovieForAdmin(MovieRequest request) {
         UserEntity currentUser = getCurrentUser();
         if (currentUser == null) {
-            throw new RuntimeException("User chưa đăng nhập");
+            throw new UnauthorizedException("User chưa đăng nhập");
         }
 
         MovieEntity movie = new MovieEntity();
@@ -1075,7 +1079,7 @@ public class MovieService {
     public MovieResponse updateMovieForStaff(Long id, Map<String, Object> updates) throws DataNotFoundException {
         UserEntity currentUser = getCurrentUser();
         if (currentUser == null) {
-            throw new RuntimeException("User chưa đăng nhập");
+            throw new UnauthorizedException("User chưa đăng nhập");
         }
 
         MovieEntity movie = movieRepository.findByIdWithCategories(id)
@@ -1085,7 +1089,7 @@ public class MovieService {
         if (movie.getStatus() != MovieEntity.MovieStatus.PENDING) {
             // Nếu không phải PENDING, kiểm tra xem có phải phim do Staff đó tạo không
             if (movie.getCreatedBy() == null || !movie.getCreatedBy().getId().equals(currentUser.getId())) {
-                throw new RuntimeException("Bạn không có quyền sửa phim này. Chỉ có thể sửa phim đang chờ duyệt hoặc phim do bạn tạo.");
+                throw new PermissionDenyException("Bạn không có quyền sửa phim này. Chỉ có thể sửa phim đang chờ duyệt hoặc phim do bạn tạo.");
             }
         }
 
@@ -1096,7 +1100,7 @@ public class MovieService {
                 MovieEntity.MovieStatus newStatus = MovieEntity.MovieStatus.valueOf(statusStr.toUpperCase());
                 // Staff chỉ có thể set status là PENDING hoặc REJECTED (nếu muốn hủy)
                 if (newStatus != MovieEntity.MovieStatus.PENDING && newStatus != MovieEntity.MovieStatus.REJECTED) {
-                    throw new RuntimeException("Staff không thể đặt status thành " + newStatus + ". Vui lòng để Admin duyệt phim.");
+                    throw new PermissionDenyException("Staff không thể đặt status thành " + newStatus + ". Vui lòng để Admin duyệt phim.");
                 }
             } catch (IllegalArgumentException e) {
                 // Ignore invalid status
@@ -1221,7 +1225,7 @@ public class MovieService {
     public MovieResponse approveMovie(Long id, String targetStatus) throws DataNotFoundException {
         UserEntity currentUser = getCurrentUser();
         if (currentUser == null) {
-            throw new RuntimeException("User chưa đăng nhập");
+            throw new UnauthorizedException("User chưa đăng nhập");
         }
 
         MovieEntity movie = movieRepository.findByIdWithCategories(id)
@@ -1229,7 +1233,7 @@ public class MovieService {
 
         // Chỉ có thể duyệt phim PENDING
         if (movie.getStatus() != MovieEntity.MovieStatus.PENDING) {
-            throw new RuntimeException("Chỉ có thể duyệt phim đang chờ duyệt (PENDING)");
+            throw new InvalidParamException("Chỉ có thể duyệt phim đang chờ duyệt (PENDING)");
         }
 
         // Set status mới (mặc định là AIRING)
@@ -1239,7 +1243,7 @@ public class MovieService {
                 newStatus = MovieEntity.MovieStatus.valueOf(targetStatus.toUpperCase());
                 // Chỉ cho phép chuyển sang ACTIVE/AIRING/UPCOMING
                 if (newStatus == MovieEntity.MovieStatus.PENDING || newStatus == MovieEntity.MovieStatus.REJECTED) {
-                    throw new RuntimeException("Không thể duyệt phim với status " + newStatus);
+                    throw new InvalidParamException("Không thể duyệt phim với status " + newStatus);
                 }
             } catch (IllegalArgumentException e) {
                 newStatus = MovieEntity.MovieStatus.AIRING;
@@ -1262,7 +1266,7 @@ public class MovieService {
     public MovieResponse rejectMovie(Long id) throws DataNotFoundException {
         UserEntity currentUser = getCurrentUser();
         if (currentUser == null) {
-            throw new RuntimeException("User chưa đăng nhập");
+            throw new UnauthorizedException("User chưa đăng nhập");
         }
 
         MovieEntity movie = movieRepository.findByIdWithCategories(id)
@@ -1270,7 +1274,7 @@ public class MovieService {
 
         // Chỉ có thể từ chối phim PENDING
         if (movie.getStatus() != MovieEntity.MovieStatus.PENDING) {
-            throw new RuntimeException("Chỉ có thể từ chối phim đang chờ duyệt (PENDING)");
+            throw new InvalidParamException("Chỉ có thể từ chối phim đang chờ duyệt (PENDING)");
         }
 
         movie.setStatus(MovieEntity.MovieStatus.REJECTED);
@@ -1308,7 +1312,7 @@ public class MovieService {
     public List<MovieResponse> getMoviesByCurrentStaff() {
         UserEntity currentUser = getCurrentUser();
         if (currentUser == null) {
-            throw new RuntimeException("User chưa đăng nhập");
+            throw new UnauthorizedException("User chưa đăng nhập");
         }
         return getMoviesByStaff(currentUser.getId());
     }

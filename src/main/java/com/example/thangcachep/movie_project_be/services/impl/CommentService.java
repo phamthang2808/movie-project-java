@@ -13,7 +13,10 @@ import com.example.thangcachep.movie_project_be.entities.CommentEntity;
 import com.example.thangcachep.movie_project_be.entities.CommentLikeEntity;
 import com.example.thangcachep.movie_project_be.entities.MovieEntity;
 import com.example.thangcachep.movie_project_be.entities.UserEntity;
+import com.example.thangcachep.movie_project_be.exceptions.ConflictException;
 import com.example.thangcachep.movie_project_be.exceptions.DataNotFoundException;
+import com.example.thangcachep.movie_project_be.exceptions.InvalidParamException;
+import com.example.thangcachep.movie_project_be.exceptions.UnauthorizedException;
 import com.example.thangcachep.movie_project_be.models.request.CommentRequest;
 import com.example.thangcachep.movie_project_be.models.responses.CommentResponse;
 import com.example.thangcachep.movie_project_be.repositories.CommentLikeRepository;
@@ -42,11 +45,11 @@ public class CommentService {
 
         // Validate content
         if (request.getContent() == null || request.getContent().trim().isEmpty()) {
-            throw new IllegalArgumentException("Nội dung comment không được để trống");
+            throw new InvalidParamException("Nội dung comment không được để trống");
         }
 
         if (request.getContent().length() > 1000) {
-            throw new IllegalArgumentException("Nội dung comment không được vượt quá 1000 ký tự");
+            throw new InvalidParamException("Nội dung comment không được vượt quá 1000 ký tự");
         }
 
         // Tạo comment entity với status APPROVED (tự động hiển thị)
@@ -244,7 +247,7 @@ public class CommentService {
 
         // Yêu cầu user phải đăng nhập
         if (user == null) {
-            throw new IllegalArgumentException("Bạn phải đăng nhập để like comment");
+            throw new UnauthorizedException("Bạn phải đăng nhập để like comment");
         }
 
         // Kiểm tra user đã like comment này chưa
@@ -411,7 +414,7 @@ public class CommentService {
 
         // Có thể duyệt comment PENDING hoặc phục hồi comment REJECTED
         if (comment.getStatus() == CommentEntity.CommentStatus.APPROVED) {
-            throw new RuntimeException("Comment đã được duyệt rồi");
+            throw new ConflictException("Comment đã được duyệt rồi");
         }
 
         comment.setStatus(CommentEntity.CommentStatus.APPROVED);
@@ -439,7 +442,7 @@ public class CommentService {
 
         // Có thể từ chối comment PENDING hoặc APPROVED (ẩn comment đã hiển thị)
         if (comment.getStatus() == CommentEntity.CommentStatus.REJECTED) {
-            throw new RuntimeException("Comment đã bị từ chối rồi");
+            throw new ConflictException("Comment đã bị từ chối rồi");
         }
 
         comment.setStatus(CommentEntity.CommentStatus.REJECTED);

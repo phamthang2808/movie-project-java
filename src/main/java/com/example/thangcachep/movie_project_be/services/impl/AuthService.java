@@ -1,11 +1,11 @@
 package com.example.thangcachep.movie_project_be.services.impl;
 
+import java.net.http.HttpHeaders;
 import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +22,9 @@ import org.springframework.web.client.RestTemplate;
 
 import com.example.thangcachep.movie_project_be.entities.RoleEntity;
 import com.example.thangcachep.movie_project_be.entities.UserEntity;
+import com.example.thangcachep.movie_project_be.exceptions.ConflictException;
+import com.example.thangcachep.movie_project_be.exceptions.DataNotFoundException;
+import com.example.thangcachep.movie_project_be.exceptions.InvalidParamException;
 import com.example.thangcachep.movie_project_be.models.dto.GoogleUserInfo;
 import com.example.thangcachep.movie_project_be.models.request.LoginRequest;
 import com.example.thangcachep.movie_project_be.models.request.RegisterRequest;
@@ -59,12 +62,12 @@ public class AuthService {
     public AuthResponse register(RegisterRequest request) {
         // Check if email already exists
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Email đã được sử dụng");
+            throw new ConflictException("Email đã được sử dụng");
         }
 
         // Get USER role
         RoleEntity userRole = roleRepository.findByName("USER")
-                .orElseThrow(() -> new RuntimeException("Role USER không tồn tại"));
+                .orElseThrow(() -> new DataNotFoundException("Role USER không tồn tại"));
 
         // Create new user
         UserEntity user = UserEntity.builder()
@@ -110,7 +113,7 @@ public class AuthService {
 
         // Get user from database
         UserEntity user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("Người dùng không tồn tại"));
+                .orElseThrow(() -> new DataNotFoundException("Người dùng không tồn tại"));
 
         // Generate tokens
         String token = jwtService.generateToken(user);
@@ -131,11 +134,11 @@ public class AuthService {
 
         // Find user
         UserEntity user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Người dùng không tồn tại"));
+                .orElseThrow(() -> new DataNotFoundException("Người dùng không tồn tại"));
 
         // Check if already verified
         if (user.getIsEmailVerified()) {
-            throw new RuntimeException("Email đã được xác thực");
+            throw new ConflictException("Email đã được xác thực");
         }
 
         // Verify email
@@ -179,6 +182,8 @@ public class AuthService {
                     .user(mapToUserResponse(user))
                     .build();
 
+        } catch (RuntimeException e) {
+            throw e; // Re-throw custom exceptions
         } catch (Exception e) {
             throw new RuntimeException("Google OAuth thất bại: " + e.getMessage());
         }
@@ -214,8 +219,7 @@ public class AuthService {
 
                 // invalid_grant thường do code đã hết hạn hoặc đã được dùng
                 if ("invalid_grant".equals(error)) {
-                    throw new RuntimeException("Authorization code không hợp lệ hoặc đã hết hạn. " +
-                            "Vui lòng thử lại từ đầu. " + errorDescription);
+                    throw new InvalidParamException("Authorization code không hợp lệ hoặc đã hết hạn. Vui lòng thử lại từ đầu.");
                 }
 
                 throw new RuntimeException("Google OAuth error: " + error + " - " + errorDescription);
@@ -265,6 +269,8 @@ public class AuthService {
             }
 
             return googleUser;
+        } catch (RuntimeException e) {
+            throw e; // Re-throw custom exceptions
         } catch (Exception e) {
             throw new RuntimeException("Lỗi khi lấy thông tin user từ Google: " + e.getMessage());
         }
@@ -276,7 +282,7 @@ public class AuthService {
     private UserEntity createUserFromGoogle(GoogleUserInfo googleUser) {
         // Get USER role
         RoleEntity userRole = roleRepository.findByName("USER")
-                .orElseThrow(() -> new RuntimeException("Role USER không tồn tại"));
+                .orElseThrow(() -> new DataNotFoundException("Role USER không tồn tại"));
 
         // Tạo user mới với thông tin từ Google
         UserEntity newUser = UserEntity.builder()
@@ -305,6 +311,7 @@ public class AuthService {
         Optional<UserEntity> userOptional = userRepository.findByEmail(email.toLowerCase());
         if (userOptional.isEmpty()) {
             // Không tiết lộ email có tồn tại hay không (security best practice)
+            // Throw generic exception để không tiết lộ thông tin
             throw new RuntimeException("Nếu email tồn tại, chúng tôi đã gửi mã OTP về email của bạn");
         }
 
@@ -346,7 +353,7 @@ public class AuthService {
         Optional<UserEntity> userOptional = userRepository.findByEmail(email.toLowerCase());
         if (userOptional.isEmpty()) {
             // Không tiết lộ email có tồn tại hay không (security best practice)
-            throw new RuntimeException("Mã OTP không đúng hoặc đã hết hạn. Vui lòng thử lại.");
+            throw new InvalidParamException("Mã OTP không đúng hoặc đã hết hạn. Vui lòng thử lại.");
         }
 
         UserEntity user = userOptional.get();
@@ -358,7 +365,7 @@ public class AuthService {
 
         // Verify OTP (chỉ kiểm tra, không xóa OTP)
         if (!otpService.verifyOtpOnly(email.toLowerCase(), otp)) {
-            throw new RuntimeException("Mã OTP không đúng hoặc đã hết hạn. Vui lòng thử lại.");
+            throw new InvalidParamException("Mã OTP không đúng hoặc đã hết hạn. Vui lòng thử lại.");
         }
 
         return Map.of(
@@ -377,7 +384,7 @@ public class AuthService {
         // Kiểm tra email có tồn tại không
         Optional<UserEntity> userOptional = userRepository.findByEmail(email.toLowerCase());
         if (userOptional.isEmpty()) {
-            throw new RuntimeException("Email không tồn tại");
+            throw new DataNotFoundException("Email không tồn tại");
         }
 
         UserEntity user = userOptional.get();
@@ -395,17 +402,17 @@ public class AuthService {
         } else {
             // OTP chưa được verify, cần verify OTP
             if (otp == null || otp.trim().isEmpty()) {
-                throw new RuntimeException("Mã OTP chưa được xác nhận. Vui lòng xác nhận OTP trước hoặc gửi mã OTP.");
+                throw new InvalidParamException("Mã OTP chưa được xác nhận. Vui lòng xác nhận OTP trước hoặc gửi mã OTP.");
             }
 
             // Validate OTP format (phải là 6 số)
             if (!otp.matches("^[0-9]{6}$")) {
-                throw new RuntimeException("Mã OTP phải là 6 số");
+                throw new InvalidParamException("Mã OTP phải là 6 số");
             }
 
             // Verify OTP
             if (!otpService.verifyOtp(email.toLowerCase(), otp)) {
-                throw new RuntimeException("Mã OTP không đúng hoặc đã hết hạn. Vui lòng thử lại.");
+                throw new InvalidParamException("Mã OTP không đúng hoặc đã hết hạn. Vui lòng thử lại.");
             }
         }
 

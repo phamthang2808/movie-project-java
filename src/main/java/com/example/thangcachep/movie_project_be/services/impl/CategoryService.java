@@ -8,6 +8,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.example.thangcachep.movie_project_be.entities.CategoryEntity;
+import com.example.thangcachep.movie_project_be.exceptions.ConflictException;
+import com.example.thangcachep.movie_project_be.exceptions.DataNotFoundException;
 import com.example.thangcachep.movie_project_be.models.request.CategoryRequest;
 import com.example.thangcachep.movie_project_be.models.responses.CategoryResponse;
 import com.example.thangcachep.movie_project_be.repositories.CategoryRepository;
@@ -39,7 +41,7 @@ public class CategoryService {
 
     public CategoryResponse getCategoryById(Long id) {
         CategoryEntity category = categoryRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy thể loại với ID: " + id));
+                .orElseThrow(() -> new DataNotFoundException("Không tìm thấy thể loại với ID: " + id));
         return mapToCategoryResponse(category);
     }
 
@@ -48,7 +50,7 @@ public class CategoryService {
     public CategoryResponse createCategory(CategoryRequest request) {
         // Kiểm tra tên category đã tồn tại chưa
         if (categoryRepository.existsByName(request.getName())) {
-            throw new RuntimeException("Thể loại với tên '" + request.getName() + "' đã tồn tại");
+            throw new ConflictException("Thể loại với tên '" + request.getName() + "' đã tồn tại");
         }
 
         // Tạo category mới
@@ -70,12 +72,12 @@ public class CategoryService {
     @CacheEvict(value = "categories", allEntries = true)
     public CategoryResponse updateCategory(Long id, CategoryRequest request) {
         CategoryEntity category = categoryRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy thể loại với ID: " + id));
+                .orElseThrow(() -> new DataNotFoundException("Không tìm thấy thể loại với ID: " + id));
 
         // Kiểm tra tên category đã tồn tại chưa (nếu đổi tên)
         if (request.getName() != null && !request.getName().equals(category.getName())) {
             if (categoryRepository.existsByName(request.getName())) {
-                throw new RuntimeException("Thể loại với tên '" + request.getName() + "' đã tồn tại");
+                throw new ConflictException("Thể loại với tên '" + request.getName() + "' đã tồn tại");
             }
             category.setName(request.getName());
         }
@@ -114,7 +116,7 @@ public class CategoryService {
     @CacheEvict(value = "categories", allEntries = true)
     public void deleteCategory(Long id) {
         CategoryEntity category = categoryRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy thể loại với ID: " + id));
+                .orElseThrow(() -> new DataNotFoundException("Không tìm thấy thể loại với ID: " + id));
 
         // Xóa category (cascade sẽ tự động xóa trong bảng movie_categories)
         categoryRepository.delete(category);

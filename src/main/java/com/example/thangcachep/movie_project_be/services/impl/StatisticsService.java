@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.example.thangcachep.movie_project_be.entities.CommentEntity;
 import com.example.thangcachep.movie_project_be.entities.MovieEntity;
 import com.example.thangcachep.movie_project_be.entities.UserEntity;
+import com.example.thangcachep.movie_project_be.exceptions.UnauthorizedException;
 import com.example.thangcachep.movie_project_be.models.responses.StatisticsResponse;
 import com.example.thangcachep.movie_project_be.repositories.CommentRepository;
 import com.example.thangcachep.movie_project_be.repositories.MovieRepository;
@@ -192,7 +193,7 @@ public class StatisticsService {
         // Lấy thông tin user hiện tại
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || authentication.getPrincipal() == null) {
-            throw new RuntimeException("User not authenticated");
+            throw new UnauthorizedException("User not authenticated");
         }
 
         Object principal = authentication.getPrincipal();
@@ -201,7 +202,7 @@ public class StatisticsService {
             currentUser = (UserEntity) principal;
         } else {
             // Nếu không phải UserEntity, không thể lấy được user
-            throw new RuntimeException("Invalid authentication principal");
+            throw new UnauthorizedException("Invalid authentication principal");
         }
         Long staffId = currentUser.getId();
 

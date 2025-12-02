@@ -13,6 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 import com.example.thangcachep.movie_project_be.entities.RoleEntity;
 import com.example.thangcachep.movie_project_be.entities.UserEntity;
 import com.example.thangcachep.movie_project_be.exceptions.DataNotFoundException;
+import com.example.thangcachep.movie_project_be.exceptions.InvalidParamException;
+import com.example.thangcachep.movie_project_be.exceptions.PermissionDenyException;
 import com.example.thangcachep.movie_project_be.models.request.ChangePasswordRequest;
 import com.example.thangcachep.movie_project_be.models.responses.UserResponse;
 import com.example.thangcachep.movie_project_be.repositories.RoleRepository;
@@ -132,19 +134,19 @@ public class UserService {
         // Nếu user đăng nhập bằng Google (không có password), bỏ qua check mật khẩu cũ
         if (user.getPassword() != null && !user.getPassword().isEmpty()) {
             if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
-                throw new IllegalArgumentException("Mật khẩu cũ không đúng");
+                throw new InvalidParamException("Mật khẩu cũ không đúng");
             }
         }
 
         // Kiểm tra mật khẩu mới và xác nhận mật khẩu có khớp không
         if (!request.getNewPassword().equals(request.getConfirmPassword())) {
-            throw new IllegalArgumentException("Mật khẩu mới và xác nhận mật khẩu không khớp");
+            throw new InvalidParamException("Mật khẩu mới và xác nhận mật khẩu không khớp");
         }
 
         // Kiểm tra mật khẩu mới có khác mật khẩu cũ không
         if (user.getPassword() != null && !user.getPassword().isEmpty()) {
             if (passwordEncoder.matches(request.getNewPassword(), user.getPassword())) {
-                throw new IllegalArgumentException("Mật khẩu mới phải khác mật khẩu cũ");
+                throw new InvalidParamException("Mật khẩu mới phải khác mật khẩu cũ");
             }
         }
 
@@ -216,7 +218,7 @@ public class UserService {
 
         // Không cho phép update admin (trừ khi là chính admin đó update profile của mình)
         if (user.getRole().getName().equalsIgnoreCase("ADMIN") && !user.getId().equals(currentUser.getId())) {
-            throw new RuntimeException("Không thể cập nhật thông tin của admin khác");
+            throw new PermissionDenyException("Không thể cập nhật thông tin của admin khác");
         }
 
         // Update name
@@ -243,7 +245,7 @@ public class UserService {
         if (request.getIsActive() != null) {
             // Không cho phép ban admin
             if (user.getRole().getName().equalsIgnoreCase("ADMIN") && !request.getIsActive()) {
-                throw new RuntimeException("Không thể khóa tài khoản admin");
+                throw new PermissionDenyException("Không thể khóa tài khoản admin");
             }
             user.setIsActive(request.getIsActive());
         }
@@ -252,12 +254,12 @@ public class UserService {
         if (request.getRole() != null && !request.getRole().trim().isEmpty()) {
             // Không cho phép thay đổi role của admin
             if (user.getRole().getName().equalsIgnoreCase("ADMIN")) {
-                throw new RuntimeException("Không thể thay đổi role của admin");
+                throw new PermissionDenyException("Không thể thay đổi role của admin");
             }
             // Update role
             String newRoleName = request.getRole().trim().toUpperCase();
             RoleEntity newRole = roleRepository.findByName(newRoleName)
-                    .orElseThrow(() -> new RuntimeException("Role không hợp lệ: " + newRoleName));
+                    .orElseThrow(() -> new DataNotFoundException("Role không hợp lệ: " + newRoleName));
             user.setRole(newRole);
         }
 
@@ -281,12 +283,12 @@ public class UserService {
 
         // Không cho phép ban admin
         if (user.getRole().getName().equalsIgnoreCase("ADMIN")) {
-            throw new RuntimeException("Không thể khóa tài khoản admin");
+            throw new PermissionDenyException("Không thể khóa tài khoản admin");
         }
 
         // Không cho phép ban chính mình
         if (user.getId().equals(currentUser.getId())) {
-            throw new RuntimeException("Không thể khóa chính mình");
+            throw new PermissionDenyException("Không thể khóa chính mình");
         }
 
         // Toggle isActive
@@ -311,12 +313,12 @@ public class UserService {
 
         // Không cho phép xóa admin
         if (user.getRole().getName().equalsIgnoreCase("ADMIN")) {
-            throw new RuntimeException("Không thể xóa tài khoản admin");
+            throw new PermissionDenyException("Không thể xóa tài khoản admin");
         }
 
         // Không cho phép xóa chính mình
         if (user.getId().equals(currentUser.getId())) {
-            throw new RuntimeException("Không thể xóa chính mình");
+            throw new PermissionDenyException("Không thể xóa chính mình");
         }
 
         // Hard delete

@@ -1,16 +1,19 @@
 package com.example.thangcachep.movie_project_be.services.impl;
 
+import java.net.http.HttpResponse;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.stereotype.Service;
+
+import com.example.thangcachep.movie_project_be.exceptions.DataNotFoundException;
 import com.example.thangcachep.movie_project_be.models.request.PayPalPaymentRequest;
 import com.example.thangcachep.movie_project_be.services.IPayPalService;
 import com.paypal.core.PayPalHttpClient;
-import com.paypal.http.HttpResponse;
 import com.paypal.orders.*;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-
-import java.util.ArrayList;
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -41,7 +44,7 @@ public class PayPalService implements IPayPalService {
                     .filter(link -> "approve".equals(link.rel()))
                     .findFirst()
                     .map(LinkDescription::href)
-                    .orElseThrow(() -> new RuntimeException("❌ Không tìm thấy approval link từ PayPal"));
+                    .orElseThrow(() -> new DataNotFoundException("Không tìm thấy approval link từ PayPal"));
             
             log.info("✅ Tạo PayPal Order thành công - Order ID: {}, Trạng thái: {}", order.id(), order.status());
             log.info("🔗 Approval URL: {}", approvalLink);

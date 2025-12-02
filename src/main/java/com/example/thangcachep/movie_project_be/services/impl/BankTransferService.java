@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.example.thangcachep.movie_project_be.config.BankAccountProperties;
 import com.example.thangcachep.movie_project_be.entities.TransactionEntity;
 import com.example.thangcachep.movie_project_be.entities.UserEntity;
+import com.example.thangcachep.movie_project_be.exceptions.DataNotFoundException;
 import com.example.thangcachep.movie_project_be.repositories.TransactionRepository;
 import com.example.thangcachep.movie_project_be.repositories.UserRepository;
 
@@ -47,7 +48,7 @@ public class BankTransferService {
 
         // Lấy user
         UserEntity user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User không tồn tại"));
+                .orElseThrow(() -> new DataNotFoundException("User không tồn tại"));
 
         // Tạo mã giao dịch unique (8 ký tự: chữ + số)
         String transactionCode = generateTransactionCode();
