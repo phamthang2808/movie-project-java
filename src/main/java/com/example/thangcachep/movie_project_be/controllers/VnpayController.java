@@ -1,5 +1,6 @@
 package com.example.thangcachep.movie_project_be.controllers;
 
+import java.io.UnsupportedEncodingException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -15,7 +16,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.thangcachep.movie_project_be.entities.UserEntity;
+import com.example.thangcachep.movie_project_be.exceptions.InvalidParamException;
 import com.example.thangcachep.movie_project_be.models.request.VnpayRequest;
+import com.example.thangcachep.movie_project_be.models.responses.ApiResponse;
 import com.example.thangcachep.movie_project_be.models.responses.VnpayPaymentResponse;
 import com.example.thangcachep.movie_project_be.services.impl.VnpayService;
 
@@ -35,36 +38,26 @@ public class VnpayController {
      * POST /api/v1/vnpay/create
      */
     @PostMapping("/create")
-    public ResponseEntity<String> createPayment(@RequestBody VnpayRequest paymentRequest) {
+    public ResponseEntity<ApiResponse<String>> createPayment(@RequestBody VnpayRequest paymentRequest) throws UnsupportedEncodingException {
+
+        // Lấy userId từ SecurityContext để lưu vào OrderInfo
+        Long userId = null;
         try {
-            log.info("📨 Nhận request tạo VNPay payment - Số tiền: {} VND", paymentRequest.getAmount());
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication != null && authentication.getPrincipal() instanceof UserEntity) {
+                UserEntity user = (UserEntity) authentication.getPrincipal();
+                userId = user.getId();
 
-            // Lấy userId từ SecurityContext để lưu vào OrderInfo
-            Long userId = null;
-            try {
-                Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-                if (authentication != null && authentication.getPrincipal() instanceof UserEntity) {
-                    UserEntity user = (UserEntity) authentication.getPrincipal();
-                    userId = user.getId();
-                    log.info("VNPay create: Lấy userId từ SecurityContext: {}", userId);
-                }
-            } catch (Exception e) {
-                log.warn("VNPay create: Không thể lấy userId từ SecurityContext: {}", e.getMessage());
             }
-
-            String paymentUrl = vnpayService.createPayment(paymentRequest, userId);
-
-            log.info("✅ Trả về payment URL cho client");
-            return ResponseEntity.ok(paymentUrl);
-
-        } catch (IllegalArgumentException e) {
-            log.error("❌ Lỗi validate: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         } catch (Exception e) {
-            log.error("❌ Lỗi tạo VNPay payment: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("❌ Đã xảy ra lỗi khi tạo thanh toán!");
+
         }
+
+        String paymentUrl = vnpayService.createPayment(paymentRequest, userId);
+
+        log.info("✅ Trả về payment URL cho client");
+        ApiResponse<String> response = ApiResponse.success("Tạo thanh toán VNPay thành công", paymentUrl);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -72,37 +65,27 @@ public class VnpayController {
      * POST /api/v1/vnpay/create-qr
      */
     @PostMapping("/create-qr")
-    public ResponseEntity<?> createPaymentWithQR(@RequestBody VnpayRequest paymentRequest) {
+    public ResponseEntity<ApiResponse<VnpayPaymentResponse>> createPaymentWithQR(@RequestBody VnpayRequest paymentRequest) throws UnsupportedEncodingException {
+        log.info("📨 Nhận request tạo VNPay payment với QR code - Số tiền: {} VND", paymentRequest.getAmount());
+
+        // Lấy userId từ SecurityContext để lưu vào OrderInfo
+        Long userId = null;
         try {
-            log.info("📨 Nhận request tạo VNPay payment với QR code - Số tiền: {} VND", paymentRequest.getAmount());
-
-            // Lấy userId từ SecurityContext để lưu vào OrderInfo
-            Long userId = null;
-            try {
-                Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-                if (authentication != null && authentication.getPrincipal() instanceof UserEntity) {
-                    UserEntity user = (UserEntity) authentication.getPrincipal();
-                    userId = user.getId();
-                    log.info("VNPay create-qr: Lấy userId từ SecurityContext: {}", userId);
-                }
-            } catch (Exception e) {
-                log.warn("VNPay create-qr: Không thể lấy userId từ SecurityContext: {}", e.getMessage());
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication != null && authentication.getPrincipal() instanceof UserEntity) {
+                UserEntity user = (UserEntity) authentication.getPrincipal();
+                userId = user.getId();
+                log.info("VNPay create-qr: Lấy userId từ SecurityContext: {}", userId);
             }
-
-            VnpayPaymentResponse response = vnpayService.createPaymentWithQR(paymentRequest, userId);
-
-            log.info("✅ Trả về VNPay payment với QR code cho client - TxnRef: {}", response.getTransactionRef());
-            return ResponseEntity.ok(response);
-
-        } catch (IllegalArgumentException e) {
-            log.error("❌ Lỗi validate: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("success", false, "message", e.getMessage()));
         } catch (Exception e) {
-            log.error("❌ Lỗi tạo VNPay payment với QR code: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("success", false, "message", "❌ Đã xảy ra lỗi khi tạo thanh toán!"));
+            log.warn("VNPay create-qr: Không thể lấy userId từ SecurityContext: {}", e.getMessage());
         }
+
+        VnpayPaymentResponse paymentResponse = vnpayService.createPaymentWithQR(paymentRequest, userId);
+
+        log.info("✅ Trả về VNPay payment với QR code cho client - TxnRef: {}", paymentResponse.getTransactionRef());
+        ApiResponse<VnpayPaymentResponse> response = ApiResponse.success("Tạo thanh toán VNPay với QR code thành công", paymentResponse);
+        return ResponseEntity.ok(response);
     }
 
     /**

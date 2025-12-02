@@ -5,19 +5,19 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
-
+/**
+ * Error response chuẩn
+ * Format: { message, status, data: null }
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class ErrorResponse {
-    
-    private LocalDateTime timestamp;
-    private int status;
-    private String error;
+
     private String message;
-    private String path;
+    private int status;
+    private Object data; // null cho error response
 }
 
 

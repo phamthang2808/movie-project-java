@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.example.thangcachep.movie_project_be.entities.UserEntity;
 import com.example.thangcachep.movie_project_be.exceptions.DataNotFoundException;
+import com.example.thangcachep.movie_project_be.models.responses.ApiResponse;
 import com.example.thangcachep.movie_project_be.models.responses.CommentResponse;
 import com.example.thangcachep.movie_project_be.services.impl.CommentService;
 
@@ -44,22 +45,12 @@ public class AdminCommentController {
      * Query params: search (tìm kiếm), status (lọc theo status)
      */
     @GetMapping
-    public ResponseEntity<?> getAllComments(
+    public ResponseEntity<ApiResponse<List<CommentResponse>>> getAllComments(
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String status) {
-        try {
-            List<CommentResponse> comments = commentService.getAllComments(search, status);
-            return ResponseEntity.ok(comments);
-        } catch (Exception e) {
-            e.printStackTrace(); // Log error để debug
-            // Trả về error message để frontend có thể hiển thị
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of(
-                            "error", "Internal Server Error",
-                            "message", e.getMessage() != null ? e.getMessage() : "Có lỗi xảy ra khi lấy danh sách comments. Vui lòng kiểm tra database đã có columns: status, approved_by_user_id, approved_at chưa?",
-                            "details", e.getClass().getSimpleName()
-                    ));
-        }
+        List<CommentResponse> comments = commentService.getAllComments(search, status);
+        ApiResponse<List<CommentResponse>> response = ApiResponse.success("Lấy danh sách comments thành công", comments);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -67,15 +58,10 @@ public class AdminCommentController {
      * GET /api/v1/admin/comments/{id}
      */
     @GetMapping("/{id}")
-    public ResponseEntity<CommentResponse> getCommentById(@PathVariable Long id) {
-        try {
-            CommentResponse comment = commentService.getCommentById(id);
-            return ResponseEntity.ok(comment);
-        } catch (DataNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+    public ResponseEntity<ApiResponse<CommentResponse>> getCommentById(@PathVariable Long id) {
+        CommentResponse comment = commentService.getCommentById(id);
+        ApiResponse<CommentResponse> response = ApiResponse.success("Lấy comment thành công", comment);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -83,21 +69,11 @@ public class AdminCommentController {
      * POST /api/v1/admin/comments/{id}/approve
      */
     @PostMapping("/{id}/approve")
-    public ResponseEntity<?> approveComment(@PathVariable Long id) {
-        try {
-            UserEntity admin = getCurrentUser();
-            CommentResponse comment = commentService.approveComment(id, admin);
-            return ResponseEntity.ok(comment);
-        } catch (DataNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("message", e.getMessage()));
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("message", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("message", "Có lỗi xảy ra: " + e.getMessage()));
-        }
+    public ResponseEntity<ApiResponse<CommentResponse>> approveComment(@PathVariable Long id) {
+        UserEntity admin = getCurrentUser();
+        CommentResponse comment = commentService.approveComment(id, admin);
+        ApiResponse<CommentResponse> response = ApiResponse.success("Duyệt comment thành công", comment);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -105,21 +81,11 @@ public class AdminCommentController {
      * POST /api/v1/admin/comments/{id}/reject
      */
     @PostMapping("/{id}/reject")
-    public ResponseEntity<?> rejectComment(@PathVariable Long id) {
-        try {
-            UserEntity admin = getCurrentUser();
-            CommentResponse comment = commentService.rejectComment(id, admin);
-            return ResponseEntity.ok(comment);
-        } catch (DataNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("message", e.getMessage()));
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("message", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("message", "Có lỗi xảy ra: " + e.getMessage()));
-        }
+    public ResponseEntity<ApiResponse<CommentResponse>> rejectComment(@PathVariable Long id) {
+        UserEntity admin = getCurrentUser();
+        CommentResponse comment = commentService.rejectComment(id, admin);
+        ApiResponse<CommentResponse> response = ApiResponse.success("Từ chối comment thành công", comment);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -127,17 +93,10 @@ public class AdminCommentController {
      * DELETE /api/v1/admin/comments/{id}
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteComment(@PathVariable Long id) {
-        try {
-            commentService.deleteComment(id);
-            return ResponseEntity.ok(Map.of("message", "Xóa comment thành công"));
-        } catch (DataNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("message", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("message", "Có lỗi xảy ra: " + e.getMessage()));
-        }
+    public ResponseEntity<ApiResponse<Void>> deleteComment(@PathVariable Long id) {
+        commentService.deleteComment(id);
+        ApiResponse<Void> response = ApiResponse.success("Xóa comment thành công", null);
+        return ResponseEntity.ok(response);
     }
 
     private UserEntity getCurrentUser() {

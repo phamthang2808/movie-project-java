@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.example.thangcachep.movie_project_be.models.responses.ApiResponse;
 import com.example.thangcachep.movie_project_be.models.responses.StatisticsResponse;
 import com.example.thangcachep.movie_project_be.services.impl.StatisticsService;
 
@@ -48,44 +49,15 @@ public class StaffStatisticsController {
      * - recentMovieTitle: Tên phim gần đây nhất
      */
     @GetMapping
-    public ResponseEntity<StatisticsResponse> getStatistics(
+    public ResponseEntity<ApiResponse<StatisticsResponse>> getStatistics(
             @RequestParam(required = false) Integer month,
             @RequestParam(required = false) Integer year,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
     ) {
-        try {
-            System.out.println("📊 Staff Statistics API called with params:");
-            System.out.println("  - month: " + month);
-            System.out.println("  - year: " + year);
-            System.out.println("  - startDate: " + startDate);
-            System.out.println("  - endDate: " + endDate);
-
-            StatisticsResponse statistics = statisticsService.getStaffStatistics(month, year, startDate, endDate);
-
-            System.out.println("📊 Staff Statistics Response:");
-            System.out.println("  - managedMovies: " + statistics.getManagedMovies());
-            System.out.println("  - todayViews: " + statistics.getTodayViews());
-
-            return ResponseEntity.ok(statistics);
-        } catch (Exception e) {
-            // Log error
-            System.err.println("Error getting staff statistics: " + e.getMessage());
-            e.printStackTrace();
-            // Trả về response rỗng với giá trị 0
-            StatisticsResponse emptyStats = StatisticsResponse.builder()
-                    .managedMovies(0L)
-                    .pendingComments(0L)
-                    .userReports(0L)
-                    .todayViews(0L)
-                    .managedMoviesChange(0L)
-                    .pendingCommentsChange(0L)
-                    .userReportsChange(0L)
-                    .todayViewsChange(0.0)
-                    .recentMovieTitle("N/A")
-                    .build();
-            return ResponseEntity.ok(emptyStats);
-        }
+        StatisticsResponse statistics = statisticsService.getStaffStatistics(month, year, startDate, endDate);
+        ApiResponse<StatisticsResponse> response = ApiResponse.success("Lấy thống kê staff thành công", statistics);
+        return ResponseEntity.ok(response);
     }
 }
 

@@ -5,6 +5,7 @@ import java.util.Map;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -21,8 +22,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.example.thangcachep.movie_project_be.entities.UserEntity;
 import com.example.thangcachep.movie_project_be.exceptions.DataNotFoundException;
+import com.example.thangcachep.movie_project_be.exceptions.InvalidParamException;
+import com.example.thangcachep.movie_project_be.exceptions.UnauthorizedException;
 import com.example.thangcachep.movie_project_be.models.request.CommentRequest;
 import com.example.thangcachep.movie_project_be.models.request.MovieRequest;
+import com.example.thangcachep.movie_project_be.models.responses.ApiResponse;
 import com.example.thangcachep.movie_project_be.models.responses.CommentResponse;
 import com.example.thangcachep.movie_project_be.models.responses.EpisodeResponse;
 import com.example.thangcachep.movie_project_be.models.responses.MovieResponse;
@@ -42,14 +46,15 @@ public class MovieController {
     private final CommentService commentService;
 
     @GetMapping
-    public ResponseEntity<Page<MovieResponse>> getAllMovies(
+    public ResponseEntity<ApiResponse<Page<MovieResponse>>> getAllMovies(
             @RequestParam(required = false) String type,
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) Boolean includeInactive,
             Pageable pageable
     ) {
         Page<MovieResponse> movies = movieService.getAllMovies(type, categoryId, includeInactive, pageable);
-        return ResponseEntity.ok(movies);
+        ApiResponse<Page<MovieResponse>> response = ApiResponse.success("Lấy danh sách phim thành công", movies);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -58,11 +63,12 @@ public class MovieController {
      * Truyền ?includeInactive=true để lấy cả phim đã xóa
      */
     @GetMapping("/all")
-    public ResponseEntity<List<MovieResponse>> getAllMoviesWithoutPagination(
+    public ResponseEntity<ApiResponse<List<MovieResponse>>> getAllMoviesWithoutPagination(
             @RequestParam(required = false, defaultValue = "false") Boolean includeInactive
     ) {
         List<MovieResponse> movies = movieService.getAllMoviesWithoutPagination(includeInactive);
-        return ResponseEntity.ok(movies);
+        ApiResponse<List<MovieResponse>> response = ApiResponse.success("Lấy danh sách phim thành công", movies);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -71,29 +77,25 @@ public class MovieController {
      * Đặt trước /{id} để tránh conflict routing
      */
     @GetMapping("/{movieId}/comments")
-    public ResponseEntity<List<CommentResponse>> getMovieComments(@PathVariable Long movieId) {
-        try {
-            // Lấy user hiện tại (có thể null nếu chưa đăng nhập)
-            UserEntity currentUser = getCurrentUser();
-            Long userId = currentUser != null ? currentUser.getId() : null;
+    public ResponseEntity<ApiResponse<List<CommentResponse>>> getMovieComments(@PathVariable Long movieId) {
+        // Lấy user hiện tại (có thể null nếu chưa đăng nhập)
+        UserEntity currentUser = getCurrentUser();
+        Long userId = currentUser != null ? currentUser.getId() : null;
 
-            List<CommentResponse> comments = commentService.getMovieComments(movieId, userId);
-            return ResponseEntity.ok(comments);
-        } catch (DataNotFoundException e) {
-            return ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
-        }
+        List<CommentResponse> comments = commentService.getMovieComments(movieId, userId);
+        ApiResponse<List<CommentResponse>> response = ApiResponse.success("Lấy danh sách bình luận thành công", comments);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<MovieResponse> getMovieById(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<MovieResponse>> getMovieById(@PathVariable Long id) {
         // Lấy user hiện tại (có thể null nếu chưa đăng nhập)
         UserEntity currentUser = getCurrentUser();
         Long userId = currentUser != null ? currentUser.getId() : null;
 
         MovieResponse movie = movieService.getMovieById(id, userId);
-        return ResponseEntity.ok(movie);
+        ApiResponse<MovieResponse> response = ApiResponse.success("Lấy phim thành công", movie);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -101,43 +103,48 @@ public class MovieController {
      * GET /api/v1/movies/{movieId}/episodes
      */
     @GetMapping("/{movieId}/episodes")
-    public ResponseEntity<List<EpisodeResponse>> getMovieEpisodes(@PathVariable Long movieId) {
+    public ResponseEntity<ApiResponse<List<EpisodeResponse>>> getMovieEpisodes(@PathVariable Long movieId) {
         // Lấy user hiện tại (có thể null nếu chưa đăng nhập)
         UserEntity currentUser = getCurrentUser();
         Long userId = currentUser != null ? currentUser.getId() : null;
 
         List<EpisodeResponse> episodes = movieService.getEpisodesByMovieId(movieId, userId);
-        return ResponseEntity.ok(episodes);
+        ApiResponse<List<EpisodeResponse>> response = ApiResponse.success("Lấy danh sách tập phim thành công", episodes);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/search")
-    public ResponseEntity<Page<MovieResponse>> searchMovies(
+    public ResponseEntity<ApiResponse<Page<MovieResponse>>> searchMovies(
             @RequestParam String q,
             Pageable pageable
     ) {
         Page<MovieResponse> movies = movieService.searchMovies(q, pageable);
-        return ResponseEntity.ok(movies);
+        ApiResponse<Page<MovieResponse>> response = ApiResponse.success("Tìm kiếm phim thành công", movies);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/trending")
-    public ResponseEntity<List<MovieResponse>> getTrendingMovies() {
+    public ResponseEntity<ApiResponse<List<MovieResponse>>> getTrendingMovies() {
         List<MovieResponse> movies = movieService.getTrendingMovies();
-        return ResponseEntity.ok(movies);
+        ApiResponse<List<MovieResponse>> response = ApiResponse.success("Lấy danh sách phim trending thành công", movies);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/top-week")
-    public ResponseEntity<List<MovieResponse>> getTopMoviesWeek() {
+    public ResponseEntity<ApiResponse<List<MovieResponse>>> getTopMoviesWeek() {
         List<MovieResponse> movies = movieService.getTopMoviesWeek();
-        return ResponseEntity.ok(movies);
+        ApiResponse<List<MovieResponse>> response = ApiResponse.success("Lấy danh sách top phim tuần thành công", movies);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/category/{categoryId}")
-    public ResponseEntity<Page<MovieResponse>> getMoviesByCategory(
+    public ResponseEntity<ApiResponse<Page<MovieResponse>>> getMoviesByCategory(
             @PathVariable Long categoryId,
             Pageable pageable
     ) {
         Page<MovieResponse> movies = movieService.getMoviesByCategory(categoryId, pageable);
-        return ResponseEntity.ok(movies);
+        ApiResponse<Page<MovieResponse>> response = ApiResponse.success("Lấy danh sách phim theo thể loại thành công", movies);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -145,16 +152,10 @@ public class MovieController {
      * GET /api/v1/movies/{movieId}/recommendations
      */
     @GetMapping("/{movieId}/recommendations")
-    public ResponseEntity<List<MovieResponse>> getRecommendedMovies(@PathVariable Long movieId) {
-        try {
-            List<MovieResponse> movies = movieService.getRecommendedMovies(movieId);
-            return ResponseEntity.ok(movies);
-        } catch (DataNotFoundException e) {
-            return ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.badRequest().build();
-        }
+    public ResponseEntity<ApiResponse<List<MovieResponse>>> getRecommendedMovies(@PathVariable Long movieId) {
+        List<MovieResponse> movies = movieService.getRecommendedMovies(movieId);
+        ApiResponse<List<MovieResponse>> response = ApiResponse.success("Lấy danh sách phim đề xuất thành công", movies);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -162,13 +163,10 @@ public class MovieController {
      * POST /api/v1/movies
      */
     @PostMapping
-    public ResponseEntity<MovieResponse> createMovie(@RequestBody MovieRequest request) {
-        try {
-            MovieResponse movie = movieService.createMovie(request);
-            return ResponseEntity.ok(movie);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
-        }
+    public ResponseEntity<ApiResponse<MovieResponse>> createMovie(@RequestBody MovieRequest request) {
+        MovieResponse movie = movieService.createMovie(request);
+        ApiResponse<MovieResponse> response = ApiResponse.success("Tạo phim thành công", 201, movie);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     /**
@@ -176,18 +174,13 @@ public class MovieController {
      * PUT /api/v1/movies/{id}
      */
     @PutMapping("/{id}")
-    public ResponseEntity<MovieResponse> updateMovie(
+    public ResponseEntity<ApiResponse<MovieResponse>> updateMovie(
             @PathVariable Long id,
             @RequestBody Map<String, Object> updates
     ) {
-        try {
-            MovieResponse movie = movieService.updateMovie(id, updates);
-            return ResponseEntity.ok(movie);
-        } catch (DataNotFoundException e) {
-            return ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
-        }
+        MovieResponse movie = movieService.updateMovie(id, updates);
+        ApiResponse<MovieResponse> response = ApiResponse.success("Cập nhật phim thành công", movie);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -195,15 +188,10 @@ public class MovieController {
      * DELETE /api/v1/movies/{id}
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteMovie(@PathVariable Long id) {
-        try {
-            movieService.deleteMovie(id);
-            return ResponseEntity.ok().build();
-        } catch (DataNotFoundException e) {
-            return ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
-        }
+    public ResponseEntity<ApiResponse<Void>> deleteMovie(@PathVariable Long id) {
+        movieService.deleteMovie(id);
+        ApiResponse<Void> response = ApiResponse.success("Xóa phim thành công", null);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -212,29 +200,20 @@ public class MovieController {
      * Yêu cầu authentication (user phải đăng nhập)
      */
     @PostMapping("/{movieId}/comments")
-    public ResponseEntity<?> addComment(
+    public ResponseEntity<ApiResponse<CommentResponse>> addComment(
             @PathVariable Long movieId,
             @RequestBody @Valid CommentRequest request
     ) {
-        try {
-            // Lấy user hiện tại từ SecurityContext
-            UserEntity user = getCurrentUser();
+        // Lấy user hiện tại từ SecurityContext
+        UserEntity user = getCurrentUser();
 
-            if (user == null) {
-                return ResponseEntity.status(401).body(Map.of("error", "Unauthorized", "message", "Bạn phải đăng nhập để bình luận"));
-            }
-
-            CommentResponse comment = commentService.createComment(movieId, request, user);
-            return ResponseEntity.ok(comment);
-        } catch (DataNotFoundException e) {
-            return ResponseEntity.status(404).body(Map.of("error", "Not Found", "message", e.getMessage()));
-        } catch (ClassCastException | NullPointerException e) {
-            // Lỗi khi không có authentication
-            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized", "message", "Bạn phải đăng nhập để bình luận"));
-        } catch (Exception e) {
-            e.printStackTrace(); // Log error để debug
-            return ResponseEntity.status(400).body(Map.of("error", "Bad Request", "message", e.getMessage()));
+        if (user == null) {
+            throw new UnauthorizedException("Bạn phải đăng nhập để bình luận");
         }
+
+        CommentResponse comment = commentService.createComment(movieId, request, user);
+        ApiResponse<CommentResponse> response = ApiResponse.success("Thêm bình luận thành công", comment);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -272,37 +251,23 @@ public class MovieController {
      * Like nếu chưa like, unlike nếu đã like
      */
     @PostMapping("/{movieId}/comments/{commentId}/like")
-    public ResponseEntity<?> toggleLikeComment(
+    public ResponseEntity<ApiResponse<CommentResponse>> toggleLikeComment(
             @PathVariable Long movieId,
             @PathVariable Long commentId
     ) {
-        try {
-            // Kiểm tra movie có tồn tại không
-            try {
-                movieService.getMovieById(movieId);
-            } catch (DataNotFoundException e) {
-                return ResponseEntity.status(404).body(Map.of("error", "Not Found", "message", "Không tìm thấy phim"));
-            }
+        // Kiểm tra movie có tồn tại không (sẽ throw DataNotFoundException nếu không tìm thấy)
+        movieService.getMovieById(movieId);
 
-            // Lấy user hiện tại (phải có, không thể null)
-            UserEntity currentUser = getCurrentUser();
+        // Lấy user hiện tại
+        UserEntity currentUser = getCurrentUser();
 
-            // Kiểm tra user đã đăng nhập chưa
-            if (currentUser == null) {
-                return ResponseEntity.status(401).body(Map.of("error", "Unauthorized", "message", "Bạn phải đăng nhập để like comment"));
-            }
-
-            CommentResponse comment = commentService.toggleLikeComment(commentId, currentUser);
-            return ResponseEntity.ok(comment);
-        } catch (DataNotFoundException e) {
-            return ResponseEntity.status(404).body(Map.of("error", "Not Found", "message", e.getMessage()));
-        } catch (IllegalArgumentException e) {
-            // Lỗi validation (ví dụ: chưa đăng nhập)
-            return ResponseEntity.status(400).body(Map.of("error", "Bad Request", "message", e.getMessage()));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(400).body(Map.of("error", "Bad Request", "message", e.getMessage()));
+        if (currentUser == null) {
+            throw new UnauthorizedException("Bạn phải đăng nhập để like comment");
         }
+
+        CommentResponse comment = commentService.toggleLikeComment(commentId, currentUser);
+        ApiResponse<CommentResponse> response = ApiResponse.success("Like comment thành công", comment);
+        return ResponseEntity.ok(response);
     }
 
     // ==========================================
@@ -315,23 +280,15 @@ public class MovieController {
      * Yêu cầu authentication
      */
     @PostMapping("/{movieId}/favorite")
-    public ResponseEntity<?> addToFavorites(@PathVariable Long movieId) {
-        try {
-            UserEntity currentUser = getCurrentUser();
-            if (currentUser == null) {
-                return ResponseEntity.status(401).body(Map.of("error", "Unauthorized", "message", "Bạn phải đăng nhập để thêm vào yêu thích"));
-            }
-
-            movieService.addToFavorites(movieId, currentUser.getId());
-            return ResponseEntity.ok(Map.of("message", "Đã thêm vào danh sách yêu thích"));
-        } catch (DataNotFoundException e) {
-            return ResponseEntity.status(404).body(Map.of("error", "Not Found", "message", e.getMessage()));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(400).body(Map.of("error", "Bad Request", "message", e.getMessage()));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(400).body(Map.of("error", "Bad Request", "message", e.getMessage()));
+    public ResponseEntity<ApiResponse<Void>> addToFavorites(@PathVariable Long movieId) {
+        UserEntity currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new UnauthorizedException("Bạn phải đăng nhập để thêm vào yêu thích");
         }
+
+        movieService.addToFavorites(movieId, currentUser.getId());
+        ApiResponse<Void> response = ApiResponse.success("Đã thêm vào danh sách yêu thích", null);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -340,21 +297,15 @@ public class MovieController {
      * Yêu cầu authentication
      */
     @DeleteMapping("/{movieId}/favorite")
-    public ResponseEntity<?> removeFromFavorites(@PathVariable Long movieId) {
-        try {
-            UserEntity currentUser = getCurrentUser();
-            if (currentUser == null) {
-                return ResponseEntity.status(401).body(Map.of("error", "Unauthorized", "message", "Bạn phải đăng nhập để xóa khỏi yêu thích"));
-            }
-
-            movieService.removeFromFavorites(movieId, currentUser.getId());
-            return ResponseEntity.ok(Map.of("message", "Đã xóa khỏi danh sách yêu thích"));
-        } catch (DataNotFoundException e) {
-            return ResponseEntity.status(404).body(Map.of("error", "Not Found", "message", e.getMessage()));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(400).body(Map.of("error", "Bad Request", "message", e.getMessage()));
+    public ResponseEntity<ApiResponse<Void>> removeFromFavorites(@PathVariable Long movieId) {
+        UserEntity currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new UnauthorizedException("Bạn phải đăng nhập để xóa khỏi yêu thích");
         }
+
+        movieService.removeFromFavorites(movieId, currentUser.getId());
+        ApiResponse<Void> response = ApiResponse.success("Đã xóa khỏi danh sách yêu thích", null);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -363,19 +314,15 @@ public class MovieController {
      * Yêu cầu authentication
      */
     @GetMapping("/favorites")
-    public ResponseEntity<?> getFavoriteMovies() {
-        try {
-            UserEntity currentUser = getCurrentUser();
-            if (currentUser == null) {
-                return ResponseEntity.status(401).body(Map.of("error", "Unauthorized", "message", "Bạn phải đăng nhập để xem danh sách yêu thích"));
-            }
-
-            List<MovieResponse> favorites = movieService.getFavoriteMovies(currentUser.getId());
-            return ResponseEntity.ok(favorites);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(400).body(Map.of("error", "Bad Request", "message", e.getMessage()));
+    public ResponseEntity<ApiResponse<List<MovieResponse>>> getFavoriteMovies() {
+        UserEntity currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new UnauthorizedException("Bạn phải đăng nhập để xem danh sách yêu thích");
         }
+
+        List<MovieResponse> favorites = movieService.getFavoriteMovies(currentUser.getId());
+        ApiResponse<List<MovieResponse>> response = ApiResponse.success("Lấy danh sách yêu thích thành công", favorites);
+        return ResponseEntity.ok(response);
     }
 
     // ==========================================
@@ -388,23 +335,15 @@ public class MovieController {
      * Yêu cầu authentication
      */
     @PostMapping("/{movieId}/watchlist")
-    public ResponseEntity<?> addToWatchlist(@PathVariable Long movieId) {
-        try {
-            UserEntity currentUser = getCurrentUser();
-            if (currentUser == null) {
-                return ResponseEntity.status(401).body(Map.of("error", "Unauthorized", "message", "Bạn phải đăng nhập để thêm vào danh sách"));
-            }
-
-            movieService.addToWatchlist(movieId, currentUser.getId());
-            return ResponseEntity.ok(Map.of("message", "Đã thêm vào danh sách xem"));
-        } catch (DataNotFoundException e) {
-            return ResponseEntity.status(404).body(Map.of("error", "Not Found", "message", e.getMessage()));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(400).body(Map.of("error", "Bad Request", "message", e.getMessage()));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(400).body(Map.of("error", "Bad Request", "message", e.getMessage()));
+    public ResponseEntity<ApiResponse<Void>> addToWatchlist(@PathVariable Long movieId) {
+        UserEntity currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new UnauthorizedException("Bạn phải đăng nhập để thêm vào danh sách");
         }
+
+        movieService.addToWatchlist(movieId, currentUser.getId());
+        ApiResponse<Void> response = ApiResponse.success("Đã thêm vào danh sách xem", null);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -413,21 +352,15 @@ public class MovieController {
      * Yêu cầu authentication
      */
     @DeleteMapping("/{movieId}/watchlist")
-    public ResponseEntity<?> removeFromWatchlist(@PathVariable Long movieId) {
-        try {
-            UserEntity currentUser = getCurrentUser();
-            if (currentUser == null) {
-                return ResponseEntity.status(401).body(Map.of("error", "Unauthorized", "message", "Bạn phải đăng nhập để xóa khỏi danh sách"));
-            }
-
-            movieService.removeFromWatchlist(movieId, currentUser.getId());
-            return ResponseEntity.ok(Map.of("message", "Đã xóa khỏi danh sách xem"));
-        } catch (DataNotFoundException e) {
-            return ResponseEntity.status(404).body(Map.of("error", "Not Found", "message", e.getMessage()));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(400).body(Map.of("error", "Bad Request", "message", e.getMessage()));
+    public ResponseEntity<ApiResponse<Void>> removeFromWatchlist(@PathVariable Long movieId) {
+        UserEntity currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new UnauthorizedException("Bạn phải đăng nhập để xóa khỏi danh sách");
         }
+
+        movieService.removeFromWatchlist(movieId, currentUser.getId());
+        ApiResponse<Void> response = ApiResponse.success("Đã xóa khỏi danh sách xem", null);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -436,19 +369,15 @@ public class MovieController {
      * Yêu cầu authentication
      */
     @GetMapping("/watchlist")
-    public ResponseEntity<?> getWatchlist() {
-        try {
-            UserEntity currentUser = getCurrentUser();
-            if (currentUser == null) {
-                return ResponseEntity.status(401).body(Map.of("error", "Unauthorized", "message", "Bạn phải đăng nhập để xem danh sách"));
-            }
-
-            List<MovieResponse> watchlist = movieService.getWatchlist(currentUser.getId());
-            return ResponseEntity.ok(watchlist);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(400).body(Map.of("error", "Bad Request", "message", e.getMessage()));
+    public ResponseEntity<ApiResponse<List<MovieResponse>>> getWatchlist() {
+        UserEntity currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new UnauthorizedException("Bạn phải đăng nhập để xem danh sách");
         }
+
+        List<MovieResponse> watchlist = movieService.getWatchlist(currentUser.getId());
+        ApiResponse<List<MovieResponse>> response = ApiResponse.success("Lấy danh sách xem thành công", watchlist);
+        return ResponseEntity.ok(response);
     }
 
     // ==========================================
@@ -461,19 +390,15 @@ public class MovieController {
      * Yêu cầu authentication
      */
     @GetMapping("/history")
-    public ResponseEntity<?> getWatchHistory() {
-        try {
-            UserEntity currentUser = getCurrentUser();
-            if (currentUser == null) {
-                return ResponseEntity.status(401).body(Map.of("error", "Unauthorized", "message", "Bạn phải đăng nhập để xem lịch sử"));
-            }
-
-            List<Map<String, Object>> history = movieService.getWatchHistoryWithProgress(currentUser.getId());
-            return ResponseEntity.ok(history);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(400).body(Map.of("error", "Bad Request", "message", e.getMessage()));
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getWatchHistory() {
+        UserEntity currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new UnauthorizedException("Bạn phải đăng nhập để xem lịch sử");
         }
+
+        List<Map<String, Object>> history = movieService.getWatchHistoryWithProgress(currentUser.getId());
+        ApiResponse<List<Map<String, Object>>> response = ApiResponse.success("Lấy lịch sử xem thành công", history);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -483,48 +408,42 @@ public class MovieController {
      * Body: { "progress": 3600 } (tính bằng giây)
      */
     @PostMapping("/{movieId}/progress")
-    public ResponseEntity<?> updateWatchProgress(
+    public ResponseEntity<ApiResponse<Void>> updateWatchProgress(
             @PathVariable Long movieId,
             @RequestBody Map<String, Object> request
     ) {
-        try {
-            UserEntity currentUser = getCurrentUser();
-            if (currentUser == null) {
-                return ResponseEntity.status(401).body(Map.of("error", "Unauthorized", "message", "Bạn phải đăng nhập để cập nhật tiến độ"));
-            }
-
-            Integer progress = null;
-            if (request.containsKey("progress")) {
-                Object progressObj = request.get("progress");
-                if (progressObj instanceof Number) {
-                    progress = ((Number) progressObj).intValue();
-                } else if (progressObj instanceof String) {
-                    progress = Integer.parseInt((String) progressObj);
-                }
-            }
-
-            if (progress == null) {
-                return ResponseEntity.status(400).body(Map.of("error", "Bad Request", "message", "Progress không hợp lệ"));
-            }
-
-            Long episodeId = null;
-            if (request.containsKey("episodeId")) {
-                Object episodeIdObj = request.get("episodeId");
-                if (episodeIdObj instanceof Number) {
-                    episodeId = ((Number) episodeIdObj).longValue();
-                } else if (episodeIdObj instanceof String) {
-                    episodeId = Long.parseLong((String) episodeIdObj);
-                }
-            }
-
-            movieService.updateWatchProgress(movieId, currentUser.getId(), progress, episodeId);
-            return ResponseEntity.ok(Map.of("message", "Đã cập nhật tiến độ xem"));
-        } catch (DataNotFoundException e) {
-            return ResponseEntity.status(404).body(Map.of("error", "Not Found", "message", e.getMessage()));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(400).body(Map.of("error", "Bad Request", "message", e.getMessage()));
+        UserEntity currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new UnauthorizedException("Bạn phải đăng nhập để cập nhật tiến độ");
         }
+
+        Integer progress = null;
+        if (request.containsKey("progress")) {
+            Object progressObj = request.get("progress");
+            if (progressObj instanceof Number) {
+                progress = ((Number) progressObj).intValue();
+            } else if (progressObj instanceof String) {
+                progress = Integer.parseInt((String) progressObj);
+            }
+        }
+
+        if (progress == null) {
+            throw new InvalidParamException("Progress không hợp lệ");
+        }
+
+        Long episodeId = null;
+        if (request.containsKey("episodeId")) {
+            Object episodeIdObj = request.get("episodeId");
+            if (episodeIdObj instanceof Number) {
+                episodeId = ((Number) episodeIdObj).longValue();
+            } else if (episodeIdObj instanceof String) {
+                episodeId = Long.parseLong((String) episodeIdObj);
+            }
+        }
+
+        movieService.updateWatchProgress(movieId, currentUser.getId(), progress, episodeId);
+        ApiResponse<Void> response = ApiResponse.success("Đã cập nhật tiến độ xem", null);
+        return ResponseEntity.ok(response);
     }
 }
 

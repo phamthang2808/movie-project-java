@@ -1,5 +1,6 @@
 package com.example.thangcachep.movie_project_be.controllers;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -13,6 +14,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.example.thangcachep.movie_project_be.exceptions.InvalidParamException;
+import com.example.thangcachep.movie_project_be.models.responses.ApiResponse;
 import com.example.thangcachep.movie_project_be.services.impl.AzureBlobStorageService;
 
 /**
@@ -32,26 +35,21 @@ public class AzureBlobStorageController {
      * POST /api/v1/upload/video
      */
     @PostMapping("/video")
-    public ResponseEntity<?> uploadVideo(@RequestParam("file") MultipartFile file) {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> uploadVideo(@RequestParam("file") MultipartFile file) throws IOException {
         // Kiểm tra file rỗng
         if (file.isEmpty()) {
-            return ResponseEntity.badRequest().body("File không được rỗng");
+            throw new InvalidParamException("File không được rỗng");
         }
 
-        try {
-            // 1. Gọi service để upload lên Azure Blob Storage
-            String fileUrl = azureBlobStorageService.uploadFile(file);
+        // 1. Gọi service để upload lên Azure Blob Storage
+        String fileUrl = azureBlobStorageService.uploadFile(file);
 
-            // 2. Trả URL về cho React
-            Map<String, String> response = new HashMap<>();
-            response.put("videoUrl", fileUrl);
+        // 2. Trả URL về cho React
+        Map<String, Object> data = new HashMap<>();
+        data.put("videoUrl", fileUrl);
 
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            e.printStackTrace(); // In lỗi ra console để debug
-            return ResponseEntity.status(500).body("Upload thất bại: " + e.getMessage());
-        }
+        ApiResponse<Map<String, Object>> response = ApiResponse.success("Upload video thành công", data);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -60,36 +58,31 @@ public class AzureBlobStorageController {
      * Cũng có thể upload file Word và các file khác (không giới hạn)
      */
     @PostMapping("/single")
-    public ResponseEntity<?> uploadImage(@RequestParam("file") MultipartFile file) {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> uploadImage(@RequestParam("file") MultipartFile file) throws IOException {
         if (file.isEmpty()) {
-            return ResponseEntity.badRequest().body("File không được rỗng");
+            throw new InvalidParamException("File không được rỗng");
         }
 
-        try {
-            // Upload lên Azure Blob Storage - chấp nhận mọi loại file (ảnh, video, document, etc.)
-            String fileUrl = azureBlobStorageService.uploadFile(file);
+        // Upload lên Azure Blob Storage - chấp nhận mọi loại file (ảnh, video, document, etc.)
+        String fileUrl = azureBlobStorageService.uploadFile(file);
 
-            // Trả URL về
-            Map<String, Object> response = new HashMap<>();
-            response.put("url", fileUrl);
-            response.put("fileUrl", fileUrl);
-            response.put("fileName", file.getOriginalFilename());
-            response.put("fileType", file.getContentType());
-            response.put("fileSize", file.getSize());
+        // Trả URL về
+        Map<String, Object> data = new HashMap<>();
+        data.put("url", fileUrl);
+        data.put("fileUrl", fileUrl);
+        data.put("fileName", file.getOriginalFilename());
+        data.put("fileType", file.getContentType());
+        data.put("fileSize", file.getSize());
 
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(500).body("Upload thất bại: " + e.getMessage());
-        }
+        ApiResponse<Map<String, Object>> response = ApiResponse.success("Upload file thành công", data);
+        return ResponseEntity.ok(response);
     }
 
     /**
      * Alias cho upload ảnh
      */
     @PostMapping("/image")
-    public ResponseEntity<?> uploadImageAlias(@RequestParam("file") MultipartFile file) {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> uploadImageAlias(@RequestParam("file") MultipartFile file) throws IOException {
         return uploadImage(file);
     }
 
@@ -98,50 +91,45 @@ public class AzureBlobStorageController {
      * POST /api/v1/upload/document
      */
     @PostMapping("/document")
-    public ResponseEntity<?> uploadDocument(@RequestParam("file") MultipartFile file) {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> uploadDocument(@RequestParam("file") MultipartFile file) throws IOException {
         if (file.isEmpty()) {
-            return ResponseEntity.badRequest().body("File không được rỗng");
+            throw new InvalidParamException("File không được rỗng");
         }
 
-        try {
-            // Validate file type - chỉ chấp nhận document files
-            String contentType = file.getContentType();
-            String originalFilename = file.getOriginalFilename();
-            String fileExtension = "";
+        // Validate file type - chỉ chấp nhận document files
+        String contentType = file.getContentType();
+        String originalFilename = file.getOriginalFilename();
+        String fileExtension = "";
 
-            if (originalFilename != null && originalFilename.contains(".")) {
-                fileExtension = originalFilename.substring(originalFilename.lastIndexOf(".")).toLowerCase();
-            }
+        if (originalFilename != null && originalFilename.contains(".")) {
+            fileExtension = originalFilename.substring(originalFilename.lastIndexOf(".")).toLowerCase();
+        }
 
-            // Danh sách các file extension được phép
-            java.util.List<String> allowedExtensions = java.util.Arrays.asList(
-                    ".doc", ".docx", ".pdf", ".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".rtf"
+        // Danh sách các file extension được phép
+        java.util.List<String> allowedExtensions = java.util.Arrays.asList(
+                ".doc", ".docx", ".pdf", ".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".rtf"
+        );
+
+        // Kiểm tra extension
+        if (!allowedExtensions.contains(fileExtension)) {
+            throw new InvalidParamException(
+                    "File không được hỗ trợ. Chỉ chấp nhận: " + String.join(", ", allowedExtensions)
             );
-
-            // Kiểm tra extension
-            if (!allowedExtensions.contains(fileExtension)) {
-                return ResponseEntity.badRequest().body(
-                        "File không được hỗ trợ. Chỉ chấp nhận: " + String.join(", ", allowedExtensions)
-                );
-            }
-
-            // Upload lên Azure Blob Storage
-            String fileUrl = azureBlobStorageService.uploadFile(file);
-
-            // Trả URL về
-            Map<String, Object> response = new HashMap<>();
-            response.put("url", fileUrl);
-            response.put("fileUrl", fileUrl);
-            response.put("fileName", originalFilename);
-            response.put("fileType", contentType);
-            response.put("fileSize", file.getSize());
-
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(500).body("Upload thất bại: " + e.getMessage());
         }
+
+        // Upload lên Azure Blob Storage
+        String fileUrl = azureBlobStorageService.uploadFile(file);
+
+        // Trả URL về
+        Map<String, Object> data = new HashMap<>();
+        data.put("url", fileUrl);
+        data.put("fileUrl", fileUrl);
+        data.put("fileName", originalFilename);
+        data.put("fileType", contentType);
+        data.put("fileSize", file.getSize());
+
+        ApiResponse<Map<String, Object>> response = ApiResponse.success("Upload document thành công", data);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -149,29 +137,24 @@ public class AzureBlobStorageController {
      * POST /api/v1/upload/file
      */
     @PostMapping("/file")
-    public ResponseEntity<?> uploadFile(@RequestParam("file") MultipartFile file) {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> uploadFile(@RequestParam("file") MultipartFile file) throws IOException {
         if (file.isEmpty()) {
-            return ResponseEntity.badRequest().body("File không được rỗng");
+            throw new InvalidParamException("File không được rỗng");
         }
 
-        try {
-            // Upload lên Azure Blob Storage - chấp nhận mọi loại file
-            String fileUrl = azureBlobStorageService.uploadFile(file);
+        // Upload lên Azure Blob Storage - chấp nhận mọi loại file
+        String fileUrl = azureBlobStorageService.uploadFile(file);
 
-            // Trả URL về
-            Map<String, Object> response = new HashMap<>();
-            response.put("url", fileUrl);
-            response.put("fileUrl", fileUrl);
-            response.put("fileName", file.getOriginalFilename());
-            response.put("fileType", file.getContentType());
-            response.put("fileSize", file.getSize());
+        // Trả URL về
+        Map<String, Object> data = new HashMap<>();
+        data.put("url", fileUrl);
+        data.put("fileUrl", fileUrl);
+        data.put("fileName", file.getOriginalFilename());
+        data.put("fileType", file.getContentType());
+        data.put("fileSize", file.getSize());
 
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(500).body("Upload thất bại: " + e.getMessage());
-        }
+        ApiResponse<Map<String, Object>> response = ApiResponse.success("Upload file thành công", data);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -179,31 +162,26 @@ public class AzureBlobStorageController {
      * POST /api/v1/upload/multiple
      */
     @PostMapping("/multiple")
-    public ResponseEntity<?> uploadMultipleFiles(@RequestParam("files") MultipartFile[] files) {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> uploadMultipleFiles(@RequestParam("files") MultipartFile[] files) throws IOException {
         if (files == null || files.length == 0) {
-            return ResponseEntity.badRequest().body("Không có file nào được chọn");
+            throw new InvalidParamException("Không có file nào được chọn");
         }
 
-        try {
-            Map<String, Object> response = new HashMap<>();
-            java.util.List<String> urls = new java.util.ArrayList<>();
+        Map<String, Object> data = new HashMap<>();
+        java.util.List<String> urls = new java.util.ArrayList<>();
 
-            for (MultipartFile file : files) {
-                if (!file.isEmpty()) {
-                    String fileUrl = azureBlobStorageService.uploadFile(file);
-                    urls.add(fileUrl);
-                }
+        for (MultipartFile file : files) {
+            if (!file.isEmpty()) {
+                String fileUrl = azureBlobStorageService.uploadFile(file);
+                urls.add(fileUrl);
             }
-
-            response.put("urls", urls);
-            response.put("count", urls.size());
-
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(500).body("Upload thất bại: " + e.getMessage());
         }
+
+        data.put("urls", urls);
+        data.put("count", urls.size());
+
+        ApiResponse<Map<String, Object>> response = ApiResponse.success("Upload multiple files thành công", data);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -211,21 +189,22 @@ public class AzureBlobStorageController {
      * DELETE /api/v1/upload/delete
      */
     @DeleteMapping("/delete")
-    public ResponseEntity<?> deleteFile(@RequestParam("fileUrl") String fileUrl) {
-        try {
-            boolean deleted = azureBlobStorageService.deleteFile(fileUrl);
-
-            if (deleted) {
-                Map<String, String> response = new HashMap<>();
-                response.put("message", "Xóa file thành công");
-                return ResponseEntity.ok(response);
-            } else {
-                return ResponseEntity.status(500).body("Xóa file thất bại");
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(500).body("Xóa file thất bại: " + e.getMessage());
+    public ResponseEntity<ApiResponse<Map<String, Object>>> deleteFile(@RequestParam("fileUrl") String fileUrl) {
+        if (fileUrl == null || fileUrl.isEmpty()) {
+            throw new InvalidParamException("File URL không được để trống");
         }
+
+        boolean deleted = azureBlobStorageService.deleteFile(fileUrl);
+
+        if (!deleted) {
+            throw new RuntimeException("Xóa file thất bại");
+        }
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("deleted", true);
+        data.put("fileUrl", fileUrl);
+
+        ApiResponse<Map<String, Object>> response = ApiResponse.success("Xóa file thành công", data);
+        return ResponseEntity.ok(response);
     }
 }
-

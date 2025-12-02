@@ -3,6 +3,7 @@ package com.example.thangcachep.movie_project_be.controllers;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.example.thangcachep.movie_project_be.exceptions.DataNotFoundException;
 import com.example.thangcachep.movie_project_be.models.request.MovieRequest;
+import com.example.thangcachep.movie_project_be.models.responses.ApiResponse;
 import com.example.thangcachep.movie_project_be.models.responses.MovieResponse;
 import com.example.thangcachep.movie_project_be.services.impl.MovieService;
 
@@ -42,15 +44,12 @@ public class AdminMovieController {
      * GET /api/v1/admin/movies
      */
     @GetMapping
-    public ResponseEntity<List<MovieResponse>> getAllMovies(
+    public ResponseEntity<ApiResponse<List<MovieResponse>>> getAllMovies(
             @RequestParam(required = false, defaultValue = "false") Boolean includeInactive
     ) {
-        try {
-            List<MovieResponse> movies = movieService.getAllMoviesWithoutPagination(includeInactive);
-            return ResponseEntity.ok(movies);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
-        }
+        List<MovieResponse> movies = movieService.getAllMoviesWithoutPagination(includeInactive);
+        ApiResponse<List<MovieResponse>> response = ApiResponse.success("Lấy danh sách phim thành công", movies);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -58,13 +57,10 @@ public class AdminMovieController {
      * GET /api/v1/admin/movies/pending
      */
     @GetMapping("/pending")
-    public ResponseEntity<List<MovieResponse>> getPendingMovies() {
-        try {
-            List<MovieResponse> movies = movieService.getPendingMovies();
-            return ResponseEntity.ok(movies);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
-        }
+    public ResponseEntity<ApiResponse<List<MovieResponse>>> getPendingMovies() {
+        List<MovieResponse> movies = movieService.getPendingMovies();
+        ApiResponse<List<MovieResponse>> response = ApiResponse.success("Lấy danh sách phim chờ duyệt thành công", movies);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -72,15 +68,10 @@ public class AdminMovieController {
      * GET /api/v1/admin/movies/{id}
      */
     @GetMapping("/{id}")
-    public ResponseEntity<MovieResponse> getMovieById(@PathVariable Long id) {
-        try {
-            MovieResponse movie = movieService.getMovieById(id);
-            return ResponseEntity.ok(movie);
-        } catch (DataNotFoundException e) {
-            return ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
-        }
+    public ResponseEntity<ApiResponse<MovieResponse>> getMovieById(@PathVariable Long id) {
+        MovieResponse movie = movieService.getMovieById(id);
+        ApiResponse<MovieResponse> response = ApiResponse.success("Lấy phim thành công", movie);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -88,13 +79,10 @@ public class AdminMovieController {
      * POST /api/v1/admin/movies
      */
     @PostMapping
-    public ResponseEntity<MovieResponse> createMovie(@RequestBody MovieRequest request) {
-        try {
-            MovieResponse movie = movieService.createMovieForAdmin(request);
-            return ResponseEntity.ok(movie);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
-        }
+    public ResponseEntity<ApiResponse<MovieResponse>> createMovie(@RequestBody MovieRequest request) {
+        MovieResponse movie = movieService.createMovieForAdmin(request);
+        ApiResponse<MovieResponse> response = ApiResponse.success("Tạo phim thành công", 201, movie);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     /**
@@ -102,18 +90,13 @@ public class AdminMovieController {
      * PUT /api/v1/admin/movies/{id}
      */
     @PutMapping("/{id}")
-    public ResponseEntity<MovieResponse> updateMovie(
+    public ResponseEntity<ApiResponse<MovieResponse>> updateMovie(
             @PathVariable Long id,
             @RequestBody Map<String, Object> updates
     ) {
-        try {
-            MovieResponse movie = movieService.updateMovieForAdmin(id, updates);
-            return ResponseEntity.ok(movie);
-        } catch (DataNotFoundException e) {
-            return ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
-        }
+        MovieResponse movie = movieService.updateMovieForAdmin(id, updates);
+        ApiResponse<MovieResponse> response = ApiResponse.success("Cập nhật phim thành công", movie);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -121,15 +104,10 @@ public class AdminMovieController {
      * DELETE /api/v1/admin/movies/{id}
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteMovie(@PathVariable Long id) {
-        try {
-            movieService.deleteMovie(id);
-            return ResponseEntity.ok().build();
-        } catch (DataNotFoundException e) {
-            return ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
-        }
+    public ResponseEntity<ApiResponse<Void>> deleteMovie(@PathVariable Long id) {
+        movieService.deleteMovie(id);
+        ApiResponse<Void> response = ApiResponse.success("Xóa phim thành công", null);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -137,21 +115,13 @@ public class AdminMovieController {
      * POST /api/v1/admin/movies/{id}/approve
      */
     @PostMapping("/{id}/approve")
-    public ResponseEntity<MovieResponse> approveMovie(
+    public ResponseEntity<ApiResponse<MovieResponse>> approveMovie(
             @PathVariable Long id,
             @RequestParam(required = false) String status // AIRING, UPCOMING, ACTIVE
     ) {
-        try {
-            MovieResponse movie = movieService.approveMovie(id, status);
-            return ResponseEntity.ok(movie);
-        } catch (DataNotFoundException e) {
-            return ResponseEntity.notFound().build();
-        } catch (RuntimeException e) {
-            // Lỗi validation (ví dụ: phim không phải PENDING)
-            return ResponseEntity.badRequest().build();
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
-        }
+        MovieResponse movie = movieService.approveMovie(id, status);
+        ApiResponse<MovieResponse> response = ApiResponse.success("Duyệt phim thành công", movie);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -159,18 +129,10 @@ public class AdminMovieController {
      * POST /api/v1/admin/movies/{id}/reject
      */
     @PostMapping("/{id}/reject")
-    public ResponseEntity<MovieResponse> rejectMovie(@PathVariable Long id) {
-        try {
-            MovieResponse movie = movieService.rejectMovie(id);
-            return ResponseEntity.ok(movie);
-        } catch (DataNotFoundException e) {
-            return ResponseEntity.notFound().build();
-        } catch (RuntimeException e) {
-            // Lỗi validation (ví dụ: phim không phải PENDING)
-            return ResponseEntity.badRequest().build();
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
-        }
+    public ResponseEntity<ApiResponse<MovieResponse>> rejectMovie(@PathVariable Long id) {
+        MovieResponse movie = movieService.rejectMovie(id);
+        ApiResponse<MovieResponse> response = ApiResponse.success("Từ chối phim thành công", movie);
+        return ResponseEntity.ok(response);
     }
 }
 

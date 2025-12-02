@@ -21,6 +21,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.example.thangcachep.movie_project_be.entities.UserEntity;
 import com.example.thangcachep.movie_project_be.exceptions.DataNotFoundException;
+import com.example.thangcachep.movie_project_be.exceptions.PermissionDenyException;
+import com.example.thangcachep.movie_project_be.models.responses.ApiResponse;
 import com.example.thangcachep.movie_project_be.models.responses.UserResponse;
 import com.example.thangcachep.movie_project_be.services.impl.UserService;
 
@@ -46,15 +48,12 @@ public class AdminUserController {
      * Query params: search (tìm kiếm theo name/email), role (lọc theo role)
      */
     @GetMapping
-    public ResponseEntity<List<UserResponse>> getAllUsers(
+    public ResponseEntity<ApiResponse<List<UserResponse>>> getAllUsers(
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String role) {
-        try {
-            List<UserResponse> users = userService.getAllUsers(search, role);
-            return ResponseEntity.ok(users);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        List<UserResponse> users = userService.getAllUsers(search, role);
+        ApiResponse<List<UserResponse>> response = ApiResponse.success("Lấy danh sách user thành công", users);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -62,15 +61,10 @@ public class AdminUserController {
      * GET /api/v1/admin/users/{id}
      */
     @GetMapping("/{id}")
-    public ResponseEntity<UserResponse> getUserById(@PathVariable Long id) {
-        try {
-            UserResponse user = userService.getUserById(id);
-            return ResponseEntity.ok(user);
-        } catch (DataNotFoundException e) {
-            return ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+    public ResponseEntity<ApiResponse<UserResponse>> getUserById(@PathVariable Long id) {
+        UserResponse user = userService.getUserById(id);
+        ApiResponse<UserResponse> response = ApiResponse.success("Lấy user thành công", user);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -78,23 +72,13 @@ public class AdminUserController {
      * PUT /api/v1/admin/users/{id}
      */
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateUser(
+    public ResponseEntity<ApiResponse<UserResponse>> updateUser(
             @PathVariable Long id,
             @RequestBody UserResponse request) {
-        try {
-            UserEntity currentUser = getCurrentUser();
-            UserResponse updatedUser = userService.updateUser(id, request, currentUser);
-            return ResponseEntity.ok(updatedUser);
-        } catch (DataNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("message", e.getMessage()));
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Map.of("message", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("message", "Có lỗi xảy ra: " + e.getMessage()));
-        }
+        UserEntity currentUser = getCurrentUser();
+        UserResponse updatedUser = userService.updateUser(id, request, currentUser);
+        ApiResponse<UserResponse> response = ApiResponse.success("Cập nhật user thành công", updatedUser);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -102,21 +86,11 @@ public class AdminUserController {
      * PUT /api/v1/admin/users/{id}/ban
      */
     @PutMapping("/{id}/ban")
-    public ResponseEntity<?> banUser(@PathVariable Long id) {
-        try {
-            UserEntity currentUser = getCurrentUser();
-            UserResponse user = userService.banUser(id, currentUser);
-            return ResponseEntity.ok(user);
-        } catch (DataNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("message", e.getMessage()));
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Map.of("message", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("message", "Có lỗi xảy ra: " + e.getMessage()));
-        }
+    public ResponseEntity<ApiResponse<UserResponse>> banUser(@PathVariable Long id) {
+        UserEntity currentUser = getCurrentUser();
+        UserResponse user = userService.banUser(id, currentUser);
+        ApiResponse<UserResponse> response = ApiResponse.success("Cập nhật trạng thái user thành công", user);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -124,21 +98,11 @@ public class AdminUserController {
      * DELETE /api/v1/admin/users/{id}
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteUser(@PathVariable Long id) {
-        try {
-            UserEntity currentUser = getCurrentUser();
-            userService.deleteUser(id, currentUser);
-            return ResponseEntity.ok(Map.of("message", "Xóa user thành công"));
-        } catch (DataNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("message", e.getMessage()));
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Map.of("message", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("message", "Có lỗi xảy ra: " + e.getMessage()));
-        }
+    public ResponseEntity<ApiResponse<Void>> deleteUser(@PathVariable Long id) {
+        UserEntity currentUser = getCurrentUser();
+        userService.deleteUser(id, currentUser);
+        ApiResponse<Void> response = ApiResponse.success("Xóa user thành công", null);
+        return ResponseEntity.ok(response);
     }
 
     private UserEntity getCurrentUser() {

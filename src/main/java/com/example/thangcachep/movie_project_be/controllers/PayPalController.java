@@ -1,6 +1,8 @@
 package com.example.thangcachep.movie_project_be.controllers;
 
+import com.example.thangcachep.movie_project_be.exceptions.InvalidParamException;
 import com.example.thangcachep.movie_project_be.models.request.PayPalPaymentRequest;
+import com.example.thangcachep.movie_project_be.models.responses.ApiResponse;
 import com.example.thangcachep.movie_project_be.services.impl.PayPalService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,39 +26,30 @@ public class PayPalController {
      * POST /api/v1/paypal/create
      */
     @PostMapping("/create")
-    public ResponseEntity<?> createPayment(@RequestBody PayPalPaymentRequest request) {
-        try {
-            log.info("📨 Nhận request tạo PayPal payment - Số tiền: {} {}",
-                    request.getAmount(), request.getCurrency());
+    public ResponseEntity<ApiResponse<Map<String, Object>>> createPayment(@RequestBody PayPalPaymentRequest request) throws Exception {
+        log.info("📨 Nhận request tạo PayPal payment - Số tiền: {} {}",
+                request.getAmount(), request.getCurrency());
 
-            // Validate request
-            if (request.getAmount() == null || request.getAmount() <= 0) {
-                log.warn("⚠️ Số tiền không hợp lệ: {}", request.getAmount());
-                return ResponseEntity.badRequest()
-                        .body(createErrorResponse("Số tiền không hợp lệ"));
-            }
-
-            if (request.getCurrency() == null || request.getCurrency().isEmpty()) {
-                request.setCurrency("USD"); // Default currency
-                log.info("💱 Sử dụng tiền tệ mặc định: USD");
-            }
-
-            // Create payment
-            String approvalUrl = payPalService.createPayment(request);
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("approvalUrl", approvalUrl);
-            response.put("message", "✅ Tạo thanh toán thành công. Vui lòng chuyển đến PayPal để hoàn tất.");
-
-            log.info("✅ Trả về approval URL cho client");
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            log.error("❌ Lỗi tạo PayPal payment: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(createErrorResponse("Không thể tạo thanh toán: " + e.getMessage()));
+        // Validate request
+        if (request.getAmount() == null || request.getAmount() <= 0) {
+            log.warn("⚠️ Số tiền không hợp lệ: {}", request.getAmount());
+            throw new InvalidParamException("Số tiền không hợp lệ");
         }
+
+        if (request.getCurrency() == null || request.getCurrency().isEmpty()) {
+            request.setCurrency("USD"); // Default currency
+            log.info("💱 Sử dụng tiền tệ mặc định: USD");
+        }
+
+        // Create payment
+        String approvalUrl = payPalService.createPayment(request);
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("approvalUrl", approvalUrl);
+
+        log.info("✅ Trả về approval URL cho client");
+        ApiResponse<Map<String, Object>> response = ApiResponse.success("Tạo thanh toán PayPal thành công. Vui lòng chuyển đến PayPal để hoàn tất.", data);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -64,25 +57,18 @@ public class PayPalController {
      * GET /api/v1/paypal/success?token=ORDER_ID
      */
     @GetMapping("/success")
-    public ResponseEntity<?> successPayment(@RequestParam("token") String orderId) {
-        try {
-            log.info("🎉 User đã approve payment - Order ID: {}", orderId);
+    public ResponseEntity<ApiResponse<Map<String, Object>>> successPayment(@RequestParam("token") String orderId) throws Exception {
+        log.info("🎉 User đã approve payment - Order ID: {}", orderId);
 
-            String result = payPalService.capturePayment(orderId);
+        String result = payPalService.capturePayment(orderId);
 
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("orderId", orderId);
-            response.put("message", result);
+        Map<String, Object> data = new HashMap<>();
+        data.put("orderId", orderId);
+        data.put("message", result);
 
-            log.info("✅ Capture payment thành công");
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            log.error("❌ Lỗi capture payment: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(createErrorResponse("Không thể hoàn tất thanh toán: " + e.getMessage()));
-        }
+        log.info("✅ Capture payment thành công");
+        ApiResponse<Map<String, Object>> response = ApiResponse.success("Thanh toán PayPal thành công", data);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -90,20 +76,13 @@ public class PayPalController {
      * GET /api/v1/paypal/cancel
      */
     @GetMapping("/cancel")
-    public ResponseEntity<?> cancelPayment() {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> cancelPayment() {
         log.warn("❌ User đã hủy thanh toán PayPal");
 
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", false);
-        response.put("message", "Thanh toán đã bị hủy bởi người dùng");
+        Map<String, Object> data = new HashMap<>();
+        data.put("cancelled", true);
 
+        ApiResponse<Map<String, Object>> response = ApiResponse.error("Thanh toán đã bị hủy bởi người dùng", 200);
         return ResponseEntity.ok(response);
-    }
-
-    private Map<String, Object> createErrorResponse(String message) {
-        Map<String, Object> error = new HashMap<>();
-        error.put("success", false);
-        error.put("message", message);
-        return error;
     }
 }

@@ -1,9 +1,9 @@
 package com.example.thangcachep.movie_project_be.controllers;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -19,6 +19,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.example.thangcachep.movie_project_be.entities.UserEntity;
 import com.example.thangcachep.movie_project_be.models.request.ChangePasswordRequest;
+import com.example.thangcachep.movie_project_be.models.responses.ApiResponse;
 import com.example.thangcachep.movie_project_be.models.responses.UserResponse;
 import com.example.thangcachep.movie_project_be.repositories.UserRepository;
 import com.example.thangcachep.movie_project_be.services.impl.AzureBlobStorageService;
@@ -38,18 +39,20 @@ public class UserController {
     private final AzureBlobStorageService azureBlobStorageService;
 
     @GetMapping("/profile")
-    public ResponseEntity<UserResponse> getProfile() {
+    public ResponseEntity<ApiResponse<UserResponse>> getProfile() {
         UserEntity user = getCurrentUser();
         // mapToUserResponse sẽ tự động check VIP expiration và trả về isVip chính xác
         // Nếu VIP đã hết hạn, nó sẽ được lưu vào DB trong checkAndUpdateVipExpiration
-        UserResponse response = userService.mapToUserResponse(user);
+        UserResponse userData = userService.mapToUserResponse(user);
+        ApiResponse<UserResponse> response = ApiResponse.success("Lấy thông tin profile thành công", userData);
         return ResponseEntity.ok(response);
     }
 
     @PutMapping("/profile")
-    public ResponseEntity<UserResponse> updateProfile(@RequestBody UserResponse request) {
+    public ResponseEntity<ApiResponse<UserResponse>> updateProfile(@RequestBody UserResponse request) {
         UserEntity user = getCurrentUser();
-        UserResponse response = userService.updateProfile(user, request);
+        UserResponse userData = userService.updateProfile(user, request);
+        ApiResponse<UserResponse> response = ApiResponse.success("Cập nhật profile thành công", userData);
         return ResponseEntity.ok(response);
     }
 
@@ -57,50 +60,43 @@ public class UserController {
      * Upload avatar
      */
     @PostMapping("/upload-avatar")
-    public ResponseEntity<Map<String, Object>> uploadAvatar(@RequestParam("avatar") MultipartFile file) {
-        try {
-            UserEntity user = getCurrentUser();
+    public ResponseEntity<ApiResponse<Map<String, Object>>> uploadAvatar(@RequestParam("avatar") MultipartFile file) throws IOException {
+        UserEntity user = getCurrentUser();
 
-            // Validate file
-            if (file.isEmpty()) {
-                return ResponseEntity.badRequest()
-                        .body(Map.of("success", false, "message", "File không được rỗng"));
-            }
-
-            // Validate file type
-            String contentType = file.getContentType();
-            if (contentType == null || !contentType.startsWith("image/")) {
-                return ResponseEntity.badRequest()
-                        .body(Map.of("success", false, "message", "File phải là ảnh"));
-            }
-
-            // Validate file size (max 5MB)
-            if (file.getSize() > 5 * 1024 * 1024) {
-                return ResponseEntity.badRequest()
-                        .body(Map.of("success", false, "message", "Ảnh không được vượt quá 5MB"));
-            }
-
-            // Upload file lên Azure Blob Storage
-            String avatarUrl = azureBlobStorageService.uploadFile(file);
-
-            // Update user avatar
-            user.setAvatarUrl(avatarUrl);
-            userRepository.save(user);
-
-            // Return response
-            UserResponse userResponse = userService.mapToUserResponse(user);
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("avatarUrl", avatarUrl);
-            response.put("user", userResponse);
-
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("success", false, "message", "Upload avatar thất bại: " + e.getMessage()));
+        // Validate file
+        if (file.isEmpty()) {
+            ApiResponse<Map<String, Object>> response = ApiResponse.error("File không được rỗng", 400);
+            return ResponseEntity.badRequest().body(response);
         }
+
+        // Validate file type
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            ApiResponse<Map<String, Object>> response = ApiResponse.error("File phải là ảnh", 400);
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        // Validate file size (max 5MB)
+        if (file.getSize() > 5 * 1024 * 1024) {
+            ApiResponse<Map<String, Object>> response = ApiResponse.error("Ảnh không được vượt quá 5MB", 400);
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        // Upload file lên Azure Blob Storage
+        String avatarUrl = azureBlobStorageService.uploadFile(file);
+
+        // Update user avatar
+        user.setAvatarUrl(avatarUrl);
+        userRepository.save(user);
+
+        // Return response
+        UserResponse userResponse = userService.mapToUserResponse(user);
+        Map<String, Object> data = new HashMap<>();
+        data.put("avatarUrl", avatarUrl);
+        data.put("user", userResponse);
+
+        ApiResponse<Map<String, Object>> response = ApiResponse.success("Upload avatar thành công", data);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -109,30 +105,12 @@ public class UserController {
      * Yêu cầu authentication
      */
     @PutMapping("/change-password")
-    public ResponseEntity<Map<String, Object>> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
-        try {
-            UserEntity user = getCurrentUser();
+    public ResponseEntity<ApiResponse<Void>> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
+        UserEntity user = getCurrentUser();
+        userService.changePassword(user, request);
 
-            userService.changePassword(user, request);
-
-            return ResponseEntity.ok(Map.of(
-                    "success", true,
-                    "message", "Đổi mật khẩu thành công"
-            ));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of(
-                            "success", false,
-                            "message", e.getMessage()
-                    ));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of(
-                            "success", false,
-                            "message", "Đổi mật khẩu thất bại: " + e.getMessage()
-                    ));
-        }
+        ApiResponse<Void> response = ApiResponse.success("Đổi mật khẩu thành công", null);
+        return ResponseEntity.ok(response);
     }
 
     private UserEntity getCurrentUser() {

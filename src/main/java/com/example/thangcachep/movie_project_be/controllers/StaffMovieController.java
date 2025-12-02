@@ -3,6 +3,7 @@ package com.example.thangcachep.movie_project_be.controllers;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -15,7 +16,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.thangcachep.movie_project_be.exceptions.DataNotFoundException;
+import com.example.thangcachep.movie_project_be.exceptions.PermissionDenyException;
 import com.example.thangcachep.movie_project_be.models.request.MovieRequest;
+import com.example.thangcachep.movie_project_be.models.responses.ApiResponse;
 import com.example.thangcachep.movie_project_be.models.responses.MovieResponse;
 import com.example.thangcachep.movie_project_be.services.impl.MovieService;
 
@@ -41,15 +44,11 @@ public class StaffMovieController {
      * GET /api/v1/staff/movies
      */
     @GetMapping
-//    @PreAuthorize("hasAnyRole('STAFF')")
-    public ResponseEntity<List<MovieResponse>> getAllMovies() {
-        try {
-            // Staff xem phim do mình tạo
-            List<MovieResponse> movies = movieService.getMoviesByCurrentStaff();
-            return ResponseEntity.ok(movies);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
-        }
+    public ResponseEntity<ApiResponse<List<MovieResponse>>> getAllMovies() {
+        // Staff xem phim do mình tạo
+        List<MovieResponse> movies = movieService.getMoviesByCurrentStaff();
+        ApiResponse<List<MovieResponse>> response = ApiResponse.success("Lấy danh sách phim thành công", movies);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -57,15 +56,10 @@ public class StaffMovieController {
      * GET /api/v1/staff/movies/{id}
      */
     @GetMapping("/{id}")
-    public ResponseEntity<MovieResponse> getMovieById(@PathVariable Long id) {
-        try {
-            MovieResponse movie = movieService.getMovieById(id);
-            return ResponseEntity.ok(movie);
-        } catch (DataNotFoundException e) {
-            return ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
-        }
+    public ResponseEntity<ApiResponse<MovieResponse>> getMovieById(@PathVariable Long id) {
+        MovieResponse movie = movieService.getMovieById(id);
+        ApiResponse<MovieResponse> response = ApiResponse.success("Lấy phim thành công", movie);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -73,13 +67,10 @@ public class StaffMovieController {
      * POST /api/v1/staff/movies
      */
     @PostMapping
-    public ResponseEntity<MovieResponse> createMovie(@RequestBody MovieRequest request) {
-        try {
-            MovieResponse movie = movieService.createMovieForStaff(request);
-            return ResponseEntity.ok(movie);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
-        }
+    public ResponseEntity<ApiResponse<MovieResponse>> createMovie(@RequestBody MovieRequest request) {
+        MovieResponse movie = movieService.createMovieForStaff(request);
+        ApiResponse<MovieResponse> response = ApiResponse.success("Tạo phim thành công", 201, movie);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     /**
@@ -87,21 +78,13 @@ public class StaffMovieController {
      * PUT /api/v1/staff/movies/{id}
      */
     @PutMapping("/{id}")
-    public ResponseEntity<MovieResponse> updateMovie(
+    public ResponseEntity<ApiResponse<MovieResponse>> updateMovie(
             @PathVariable Long id,
             @RequestBody Map<String, Object> updates
     ) {
-        try {
-            MovieResponse movie = movieService.updateMovieForStaff(id, updates);
-            return ResponseEntity.ok(movie);
-        } catch (DataNotFoundException e) {
-            return ResponseEntity.notFound().build();
-        } catch (RuntimeException e) {
-            // Lỗi permission
-            return ResponseEntity.status(403).build();
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
-        }
+        MovieResponse movie = movieService.updateMovieForStaff(id, updates);
+        ApiResponse<MovieResponse> response = ApiResponse.success("Cập nhật phim thành công", movie);
+        return ResponseEntity.ok(response);
     }
 
     // Staff KHÔNG CÓ quyền DELETE - chỉ Admin mới có

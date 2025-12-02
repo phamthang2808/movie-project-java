@@ -3,6 +3,7 @@ package com.example.thangcachep.movie_project_be.controllers;
 import java.util.List;
 
 import com.example.thangcachep.movie_project_be.models.dto.FeaturedMovieDTO;
+import com.example.thangcachep.movie_project_be.models.responses.ApiResponse;
 import com.example.thangcachep.movie_project_be.services.impl.FeaturedMovieService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -26,8 +27,9 @@ public class FeaturedMovieController {
      * Public endpoint - ai cũng có thể xem
      */
     @GetMapping
-    public ResponseEntity<List<FeaturedMovieDTO>> getFeaturedMovies() {
+    public ResponseEntity<ApiResponse<List<FeaturedMovieDTO>>> getFeaturedMovies() {
         List<FeaturedMovieDTO> featuredMovies = featuredMovieService.getFeaturedMovies();
-        return ResponseEntity.ok(featuredMovies);
+        ApiResponse<List<FeaturedMovieDTO>> response = ApiResponse.success("Lấy danh sách phim nổi bật thành công", featuredMovies);
+        return ResponseEntity.ok(response);
     }
 }
