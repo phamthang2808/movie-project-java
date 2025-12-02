@@ -16,28 +16,22 @@ services:
         sync: false
       - key: SPRING_DATASOURCE_PASSWORD
         sync: false
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: movie-redis
-          property: connectionString
       - key: REDIS_HOST
-        fromService:
-          type: redis
-          name: movie-redis
-          property: host
+        sync: false # Set thủ công: clear-phoenix-38580.upstash.io (nếu dùng Upstash)
       - key: REDIS_PORT
-        fromService:
-          type: redis
-          name: movie-redis
-          property: port
+        sync: false # Set thủ công: 6379
+      - key: REDIS_PASSWORD
+        sync: false # Set thủ công: password từ Upstash
       - key: REDIS_ENABLED
         value: "true"
       - key: CORS_ALLOWED_ORIGINS
         sync: false # Set sau khi có frontend URL (ví dụ: https://your-frontend.onrender.com)
 
-  # Redis Service (nếu backend cần Redis)
-  - type: redis
-    name: movie-redis
-    plan: starter
-    maxmemoryPolicy: allkeys-lru
+
+  # Redis Service - BỎ QUA nếu dùng Upstash Redis (external)
+  # Nếu muốn dùng Redis từ Render, uncomment phần dưới và thêm IP allow list
+  # - type: redis
+  #   name: movie-redis
+  #   plan: starter
+  #   maxmemoryPolicy: allkeys-lru
+  #   ipAllowList: []
