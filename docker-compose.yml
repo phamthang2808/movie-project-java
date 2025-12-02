@@ -1,0 +1,75 @@
+version: "3.8"
+
+services:
+  # Redis Service
+  redis:
+    image: redis:7-alpine
+    container_name: movie-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks:
+      - movie-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # Backend Service
+  backend:
+    build:
+      context: ./movie-project-be
+      dockerfile: Dockerfile
+    container_name: movie-backend
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=
+      - REDIS_ENABLED=true
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - movie-network
+    restart: unless-stopped
+
+  # Frontend Service
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.fe
+    container_name: movie-frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8080/api/v1
+      - VITE_API_URL=http://localhost:8080
+      - VITE_APP_ENV=development
+    volumes:
+      # Mount source code để hot reload hoạt động
+      - ./src:/app/src
+      - ./public:/app/public
+      - ./index.html:/app/index.html
+      - ./vite.config.js:/app/vite.config.js
+      - ./package.json:/app/package.json
+      # Exclude node_modules để dùng từ container
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - movie-network
+    restart: unless-stopped
+
+networks:
+  movie-network:
+    driver: bridge
+
+volumes:
+  redis-data:
